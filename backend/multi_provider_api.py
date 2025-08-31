@@ -14,7 +14,9 @@ import asyncio
 from contextlib import asynccontextmanager
 
 # Import config and AI libraries
-from config import Config
+from core.config import get_config
+Config = get_config()
+
 try:
     import google.generativeai as genai
     from google.generativeai.generative_models import GenerativeModel
@@ -323,7 +325,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

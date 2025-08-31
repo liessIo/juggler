@@ -1,4 +1,4 @@
-from config import Config
+from config import Config # type: ignore
 import google.generativeai as genai
 
 print(f"API Key configured: {Config.is_gemini_configured()}")

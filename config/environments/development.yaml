@@ -1,0 +1,60 @@
+# File: config/environments/development.yaml
+# Development environment configuration overrides
+
+server:
+  host: "127.0.0.1"  # Local development only
+  port: 8000
+  reload: true
+  debug: true
+
+frontend:
+  port: 5173
+
+cors:
+  allow_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173" 
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+
+providers:
+  ollama:
+    enabled: true
+    base_url: "http://localhost:11434"
+    
+  groq:
+    enabled: true
+    
+  gemini:
+    enabled: true  # Can be tested in dev
+    
+  openai:
+    enabled: false
+
+database:
+  path: "data/dev/juggler-dev.db"
+  echo: true  # SQL logging in development
+
+logging:
+  level: "DEBUG"
+  file: "logs/dev/juggler-dev.log"
+  console: true
+  
+security:
+  rate_limiting:
+    enabled: false  # Disabled for development testing
+    
+features:
+  hot_reload: true
+  debug_endpoints: true
+  mock_providers: false  # Set to true to test without API keys
+
+monitoring:
+  health_check_interval: 10  # More frequent in dev
+  detailed_errors: true
+  
+development:
+  auto_reload: true
+  mock_latency: false
+  test_mode: false
+  fixture_data: false
