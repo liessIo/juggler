@@ -1,12 +1,17 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+// frontend/src/main.ts
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+// import router from './router';
+import App from './App.vue';
+import authService from '@/services/auth.service';
 
-import App from './App.vue'
-import router from './router'
+const app = createApp(App);
+const pinia = createPinia();
 
-const app = createApp(App)
+app.use(pinia);
+// app.use(router);
 
-app.use(createPinia())
-app.use(router)
+// Check authentication on app start
+authService.getCurrentUser();
 
-app.mount('#app')
+app.mount('#app');

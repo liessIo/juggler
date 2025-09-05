@@ -1,359 +1,446 @@
-/**
- * File: src/stores/chatStore.ts
- * Pinia Store for Juggler Multi-Provider Chat Application
- * Manages global application state, provider switching, and conversations
- */
+// frontend/src/stores/chatStore.ts
 
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { JugglerAPI, type ChatRequest } from '@/services/api'
-import type {
-  ChatMessage,
-  Conversation,
-  AIProvider,
-  AIModel,
-  ChatState,
-  ProviderSwitchOptions,
-} from '@/types/chat'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import apiInstance from '@/services/api';
+import type { Provider, Message, Conversation, ChatRequest, ProvidersStatus } from '@/services/api';
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  provider?: string;
+  model?: string;
+  latency?: number;
+  tokens?: number;
+  error?: boolean;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+  provider?: string;
+  model?: string;
+}
 
 export const useChatStore = defineStore('chat', () => {
   // State
-  const conversations = ref<Conversation[]>([])
-  const activeConversationId = ref<string | null>(null)
-  const providers = ref<AIProvider[]>([])
-  const currentProvider = ref<string>('ollama')
-  const currentModel = ref<string>('')
-  const isLoading = ref<boolean>(false)
-  const error = ref<string | null>(null)
-  const connectionStatus = ref<'connected' | 'connecting' | 'disconnected'>('disconnected')
+  const sessions = ref<ChatSession[]>([]);
+  const currentSessionId = ref<string | null>(null);
+  const providers = ref<ProvidersStatus | null>(null);
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+  const currentProvider = ref<string>('ollama');
+  const currentModel = ref<string>('llama3:8b');
+  const isInitialized = ref(false);
 
   // Computed
-  const activeConversation = computed(() => {
-    if (!activeConversationId.value) return null
-    return conversations.value.find(conv => conv.id === activeConversationId.value) || null
-  })
+  const currentSession = computed(() => {
+    if (!currentSessionId.value) return null;
+    return sessions.value.find(s => s.id === currentSessionId.value) || null;
+  });
 
   const availableProviders = computed(() => {
-    return providers.value.filter(provider => provider.status === 'healthy')
-  })
+    if (!providers.value) return [];
+    
+    const available: Array<{ name: string; models: string[] }> = [];
+    
+    Object.entries(providers.value).forEach(([name, provider]) => {
+      if (provider.available) {
+        available.push({
+          name,
+          models: provider.models
+        });
+      }
+    });
+    
+    return available;
+  });
 
-  const currentProviderData = computed(() => {
-    return providers.value.find(p => p.id === currentProvider.value)
-  })
-
-  const availableModels = computed(() => {
-    const provider = currentProviderData.value
-    return provider ? provider.models : []
-  })
-
-  const hasHealthyProviders = computed(() => {
-    return providers.value.some(p => p.status === 'healthy')
-  })
+  const currentMessages = computed(() => {
+    return currentSession.value?.messages || [];
+  });
 
   // Actions
   async function initialize() {
-    console.log('Initializing chat store...')
-    await testConnection()
-    await loadProviders()
-    createNewConversation()
-  }
-
-  async function testConnection() {
-    connectionStatus.value = 'connecting'
+    if (isInitialized.value) return;
+    
     try {
-      const isConnected = await JugglerAPI.testConnection()
-      connectionStatus.value = isConnected ? 'connected' : 'disconnected'
+      isLoading.value = true;
+      error.value = null;
       
-      if (!isConnected) {
-        error.value = 'Cannot connect to backend. Make sure the FastAPI server is running on port 8000.'
+      // Load providers
+      await loadProviders();
+      
+      // Load saved sessions from localStorage
+      loadSessionsFromStorage();
+      
+      // Create initial session if none exists
+      if (sessions.value.length === 0) {
+        createNewSession();
       } else {
-        error.value = null
+        currentSessionId.value = sessions.value[0].id;
       }
       
-      return isConnected
+      isInitialized.value = true;
     } catch (err) {
-      connectionStatus.value = 'disconnected'
-      error.value = 'Backend connection failed'
-      return false
+      console.error('Failed to initialize chat store:', err);
+      error.value = 'Failed to initialize chat';
+    } finally {
+      isLoading.value = false;
     }
   }
 
   async function loadProviders() {
     try {
-      isLoading.value = true
-      const response = await JugglerAPI.getProviders()
+      const providerData = await apiInstance.getProviders();
+      providers.value = providerData;
       
-      providers.value = response.providers.map(provider => ({
-        id: provider.id,
-        name: provider.name,
-        status: provider.status as 'healthy' | 'degraded' | 'down' | 'not_configured',
-        models: provider.models.map(model => ({
-          id: model.id,
-          name: model.name,
-          provider: model.provider,
-          contextWindow: model.context_window || 4096,
-          supportsVision: model.supports_vision,
-        })),
-        latencyMs: provider.latency_ms,
-      }))
-
-      // Set default provider to first healthy one
-      const healthyProvider = providers.value.find(p => p.status === 'healthy')
-      if (healthyProvider) {
-        currentProvider.value = healthyProvider.id
-        if (healthyProvider.models.length > 0) {
-          currentModel.value = healthyProvider.models[0].id
-        }
+      // Set default provider to first available
+      const firstAvailable = availableProviders.value[0];
+      if (firstAvailable) {
+        currentProvider.value = firstAvailable.name;
+        currentModel.value = firstAvailable.models[0] || '';
       }
-
-      console.log(`Loaded ${response.providers.length} providers, ${response.healthy_providers} healthy`)
-    } catch (err: any) {
-      error.value = `Failed to load providers: ${err.message}`
-      console.error('Provider loading error:', err)
-    } finally {
-      isLoading.value = false
+    } catch (err) {
+      console.error('Provider loading error:', err);
+      error.value = 'Could not load AI providers';
+      
+      // Set some defaults even if loading fails
+      providers.value = {
+        ollama: { name: 'ollama', available: false, models: [] },
+        groq: { name: 'groq', available: false, models: [] },
+        gemini: { name: 'gemini', available: false, models: [] }
+      };
     }
   }
 
-  function createNewConversation(title?: string) {
-    const conversation: Conversation = {
-      id: Date.now().toString(),
-      title: title || `Chat ${conversations.value.length + 1}`,
+  function createNewSession() {
+    const newSession: ChatSession = {
+      id: generateId(),
+      title: `Chat ${sessions.value.length + 1}`,
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      currentProvider: currentProvider.value,
-      currentModel: currentModel.value,
-      totalTokens: 0,
-    }
-
-    conversations.value.push(conversation)
-    activeConversationId.value = conversation.id
-    return conversation
-  }
-
-  function setActiveConversation(conversationId: string) {
-    const conversation = conversations.value.find(conv => conv.id === conversationId)
-    if (conversation) {
-      activeConversationId.value = conversationId
-      currentProvider.value = conversation.currentProvider
-      currentModel.value = conversation.currentModel
-    }
+      provider: currentProvider.value,
+      model: currentModel.value
+    };
+    
+    sessions.value.unshift(newSession);
+    currentSessionId.value = newSession.id;
+    saveSessionsToStorage();
+    
+    return newSession;
   }
 
   async function sendMessage(content: string) {
-    if (!activeConversation.value) {
-      createNewConversation()
-    }
-
-    const conversation = activeConversation.value
-    if (!conversation) return
-
+    if (!content.trim() || !currentSession.value) return;
+    
     // Add user message
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content,
+      id: generateId(),
       role: 'user',
-      provider: currentProvider.value,
-      model: currentModel.value,
+      content: content.trim(),
       timestamp: new Date(),
-    }
-
-    conversation.messages.push(userMessage)
-    conversation.updatedAt = new Date()
-
-    // Update conversation title if first message
-    if (conversation.messages.length === 1) {
-      conversation.title = content.length > 30 ? content.substring(0, 30) + '...' : content
-    }
-
-    isLoading.value = true
-    error.value = null
-
+      provider: currentProvider.value,
+      model: currentModel.value
+    };
+    
+    currentSession.value.messages.push(userMessage);
+    saveSessionsToStorage();
+    
+    // Send to API
+    isLoading.value = true;
+    error.value = null;
+    
     try {
-      // Build conversation history for context
-      const conversationHistory = conversation.messages
-        .filter(msg => msg.role !== 'system') // Exclude system messages
-        .map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content
-        }))
-
-      const request: ChatRequest = {
-        message: content,
+      const response = await apiInstance.sendMessage({
+        content: content.trim(),
         provider: currentProvider.value,
         model: currentModel.value,
-        conversation_history: conversationHistory
-      }
-
-      const response = await JugglerAPI.sendMessage(request)
-
+        conversation_id: currentSession.value.id
+      });
+      
       // Add assistant response
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: response.response,
+        id: generateId(),
         role: 'assistant',
+        content: response.response,
+        timestamp: new Date(response.timestamp),
         provider: response.provider,
         model: response.model,
-        timestamp: new Date(),
-        latency_ms: response.latency_ms,
-        tokens: response.input_tokens && response.output_tokens ? {
-          input: response.input_tokens,
-          output: response.output_tokens,
-        } : undefined,
-      }
-
-      conversation.messages.push(assistantMessage)
-      conversation.updatedAt = new Date()
-
-      // Update token count
-      if (assistantMessage.tokens) {
-        conversation.totalTokens += assistantMessage.tokens.input + assistantMessage.tokens.output
-      }
-
-    } catch (err: any) {
-      error.value = `Chat error: ${err.message}`
+        latency: response.latency,
+        tokens: response.tokens
+      };
       
-      // Add error message to chat
+      currentSession.value.messages.push(assistantMessage);
+      currentSession.value.updatedAt = new Date();
+      
+      // Update session title if it's the first exchange
+      if (currentSession.value.messages.length === 2) {
+        currentSession.value.title = content.slice(0, 50) + (content.length > 50 ? '...' : '');
+      }
+      
+      saveSessionsToStorage();
+    } catch (err: any) {
+      console.error('Failed to send message:', err);
+      
+      // Add error message
       const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: `Error: ${err.message}`,
+        id: generateId(),
         role: 'assistant',
+        content: `Error: ${err.message || 'Failed to get response'}`,
+        timestamp: new Date(),
         provider: currentProvider.value,
         model: currentModel.value,
-        timestamp: new Date(),
-        error: err.message,
-      }
-      conversation.messages.push(errorMessage)
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  async function switchProvider(options: ProviderSwitchOptions) {
-    const targetProvider = providers.value.find(p => p.id === options.targetProvider)
-    if (!targetProvider || targetProvider.status !== 'healthy') {
-      error.value = `Provider ${options.targetProvider} is not available`
-      return false
-    }
-
-    const targetModel = options.targetModel || targetProvider.models[0]?.id
-    if (!targetModel) {
-      error.value = `No models available for provider ${options.targetProvider}`
-      return false
-    }
-
-    const previousProvider = currentProvider.value
-    const previousModel = currentModel.value
-
-    // Update current provider/model
-    currentProvider.value = options.targetProvider
-    currentModel.value = targetModel
-
-    // Update active conversation
-    if (activeConversation.value) {
-      activeConversation.value.currentProvider = options.targetProvider
-      activeConversation.value.currentModel = targetModel
-      activeConversation.value.updatedAt = new Date()
-
-      // Add system message about switch
-      if (options.preserveContext) {
-        const switchMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content: `Switched from ${previousProvider}/${previousModel} to ${options.targetProvider}/${targetModel} with context preservation`,
-          role: 'system',
-          provider: options.targetProvider,
-          model: targetModel,
-          timestamp: new Date(),
-        }
-        activeConversation.value.messages.push(switchMessage)
-      }
-    }
-
-    console.log(`Switched provider: ${previousProvider} → ${options.targetProvider}`)
-    return true
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  function deleteConversation(conversationId: string) {
-    const index = conversations.value.findIndex(conv => conv.id === conversationId)
-    if (index !== -1) {
-      conversations.value.splice(index, 1)
+        error: true
+      };
       
-      // If deleted conversation was active, switch to most recent
-      if (activeConversationId.value === conversationId) {
-        if (conversations.value.length > 0) {
-          activeConversationId.value = conversations.value[conversations.value.length - 1].id
-        } else {
-          activeConversationId.value = null
-          createNewConversation()
-        }
+      currentSession.value.messages.push(errorMessage);
+      error.value = err.message || 'Failed to send message';
+      saveSessionsToStorage();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  function switchProvider(provider: string, model?: string) {
+    currentProvider.value = provider;
+    
+    if (model) {
+      currentModel.value = model;
+    } else {
+      // Set default model for provider
+      const providerData = providers.value?.[provider as keyof ProvidersStatus];
+      if (providerData && providerData.models.length > 0) {
+        currentModel.value = providerData.models[0];
+      }
+    }
+    
+    // Update current session if exists
+    if (currentSession.value) {
+      currentSession.value.provider = provider;
+      currentSession.value.model = currentModel.value;
+      saveSessionsToStorage();
+    }
+  }
+
+  function switchSession(sessionId: string) {
+    const session = sessions.value.find(s => s.id === sessionId);
+    if (session) {
+      currentSessionId.value = sessionId;
+      // Update provider/model to match session
+      if (session.provider) {
+        currentProvider.value = session.provider;
+      }
+      if (session.model) {
+        currentModel.value = session.model;
       }
     }
   }
 
-  function exportConversation(conversationId: string) {
-    const conversation = conversations.value.find(conv => conv.id === conversationId)
-    if (!conversation) return null
-
-    const exportData = {
-      title: conversation.title,
-      createdAt: conversation.createdAt,
-      totalTokens: conversation.totalTokens,
-      messages: conversation.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        provider: msg.provider,
-        model: msg.model,
-        timestamp: msg.timestamp,
-        latency_ms: msg.latency_ms,
-        tokens: msg.tokens,
-      })),
+  function deleteSession(sessionId: string) {
+    const index = sessions.value.findIndex(s => s.id === sessionId);
+    if (index !== -1) {
+      sessions.value.splice(index, 1);
+      
+      // If we deleted the current session, switch to another
+      if (currentSessionId.value === sessionId) {
+        if (sessions.value.length > 0) {
+          currentSessionId.value = sessions.value[0].id;
+        } else {
+          createNewSession();
+        }
+      }
+      
+      saveSessionsToStorage();
     }
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `juggler-chat-${conversation.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`
-    a.click()
-    
-    URL.revokeObjectURL(url)
   }
 
-  // Return store interface
+  function clearCurrentSession() {
+    if (currentSession.value) {
+      currentSession.value.messages = [];
+      currentSession.value.updatedAt = new Date();
+      saveSessionsToStorage();
+    }
+  }
+
+  function editMessage(messageId: string, newContent: string) {
+    if (!currentSession.value) return;
+    
+    const message = currentSession.value.messages.find(m => m.id === messageId);
+    if (message) {
+      message.content = newContent;
+      currentSession.value.updatedAt = new Date();
+      saveSessionsToStorage();
+    }
+  }
+
+  function deleteMessage(messageId: string) {
+    if (!currentSession.value) return;
+    
+    const index = currentSession.value.messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      currentSession.value.messages.splice(index, 1);
+      currentSession.value.updatedAt = new Date();
+      saveSessionsToStorage();
+    }
+  }
+
+  async function regenerateLastResponse() {
+    if (!currentSession.value || currentSession.value.messages.length < 2) return;
+    
+    // Find last user message
+    let lastUserMessageIndex = -1;
+    for (let i = currentSession.value.messages.length - 1; i >= 0; i--) {
+      if (currentSession.value.messages[i].role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+    
+    if (lastUserMessageIndex === -1) return;
+    
+    // Remove all messages after the last user message
+    currentSession.value.messages = currentSession.value.messages.slice(0, lastUserMessageIndex + 1);
+    
+    // Resend the last user message
+    const lastUserMessage = currentSession.value.messages[lastUserMessageIndex];
+    await sendMessage(lastUserMessage.content);
+  }
+
+  async function refreshProviders() {
+    await loadProviders();
+  }
+
+  // Storage helpers
+  function saveSessionsToStorage() {
+    try {
+      const dataToSave = {
+        sessions: sessions.value.map(s => ({
+          ...s,
+          messages: s.messages.slice(-100) // Keep only last 100 messages per session
+        })),
+        currentSessionId: currentSessionId.value,
+        currentProvider: currentProvider.value,
+        currentModel: currentModel.value
+      };
+      
+      localStorage.setItem('juggler_chat_data', JSON.stringify(dataToSave));
+    } catch (err) {
+      console.error('Failed to save sessions:', err);
+    }
+  }
+
+  function loadSessionsFromStorage() {
+    try {
+      const savedData = localStorage.getItem('juggler_chat_data');
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        
+        // Convert dates back from strings
+        sessions.value = parsed.sessions.map((s: any) => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+          messages: s.messages.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }))
+        }));
+        
+        if (parsed.currentSessionId) {
+          currentSessionId.value = parsed.currentSessionId;
+        }
+        if (parsed.currentProvider) {
+          currentProvider.value = parsed.currentProvider;
+        }
+        if (parsed.currentModel) {
+          currentModel.value = parsed.currentModel;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+      sessions.value = [];
+    }
+  }
+
+  function exportSessions() {
+    const dataStr = JSON.stringify(sessions.value, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `juggler-chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  }
+
+  function importSessions(jsonData: string) {
+    try {
+      const imported = JSON.parse(jsonData);
+      
+      // Validate and convert dates
+      const validSessions = imported.map((s: any) => ({
+        ...s,
+        id: s.id || generateId(),
+        createdAt: new Date(s.createdAt || Date.now()),
+        updatedAt: new Date(s.updatedAt || Date.now()),
+        messages: (s.messages || []).map((m: any) => ({
+          ...m,
+          id: m.id || generateId(),
+          timestamp: new Date(m.timestamp || Date.now())
+        }))
+      }));
+      
+      sessions.value = [...sessions.value, ...validSessions];
+      saveSessionsToStorage();
+    } catch (err) {
+      console.error('Failed to import sessions:', err);
+      throw new Error('Invalid import file format');
+    }
+  }
+
+  // Utility
+  function generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
   return {
     // State
-    conversations,
-    activeConversationId,
+    sessions,
+    currentSessionId,
     providers,
-    currentProvider,
-    currentModel,
     isLoading,
     error,
-    connectionStatus,
-
+    currentProvider,
+    currentModel,
+    isInitialized,
+    
     // Computed
-    activeConversation,
+    currentSession,
     availableProviders,
-    currentProviderData,
-    availableModels,
-    hasHealthyProviders,
-
+    currentMessages,
+    
     // Actions
     initialize,
-    testConnection,
     loadProviders,
-    createNewConversation,
-    setActiveConversation,
+    createNewSession,
     sendMessage,
     switchProvider,
-    clearError,
-    deleteConversation,
-    exportConversation,
-  }
-})
+    switchSession,
+    deleteSession,
+    clearCurrentSession,
+    editMessage,
+    deleteMessage,
+    regenerateLastResponse,
+    refreshProviders,
+    exportSessions,
+    importSessions
+  };
+});

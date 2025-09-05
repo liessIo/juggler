@@ -1,11 +1,4 @@
 <template>
-  <!-- 
-    File: src/components/ChatInterface.vue
-    Main chat interface component for Juggler
-    Handles message display, input, and provider switching
-  -->
-
-
   <div class="chat-interface">
     <!-- Header with Provider Selection -->
     <div class="chat-header">
@@ -16,13 +9,29 @@
         </div>
       </div>
       
-      <ProviderSelector
-        :providers="availableProviders"
-        :selectedProvider="currentProvider"
-        :selectedModel="currentModel"
-        @providerChange="handleProviderChange"
-        :disabled="isLoading"
-      />
+      <!-- Provider and Model Selector -->
+      <div v-if="availableProviders && availableProviders.length > 0" class="provider-selector-wrapper">
+        <div class="selector-group">
+          <label>Provider:</label>
+          <select v-model="currentProvider" @change="handleProviderChange(currentProvider)">
+            <option v-for="provider in availableProviders" :key="provider.name" :value="provider.name">
+              {{ provider.name }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="selector-group" v-if="currentProviderModels.length > 0">
+          <label>Model:</label>
+          <select v-model="currentModel" @change="handleModelChange(currentModel)">
+            <option v-for="model in currentProviderModels" :key="model" :value="model">
+              {{ formatModelName(model) }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div v-else class="no-providers">
+        No providers available
+      </div>
     </div>
 
     <!-- Error Banner -->
@@ -33,25 +42,29 @@
 
     <!-- Chat Messages Area -->
     <div class="messages-container" ref="messagesContainer">
-      <div v-if="!activeConversation || activeConversation.messages.length === 0" class="welcome-message">
+      <div v-if="!currentSession || !currentSession.messages || currentSession.messages.length === 0" class="welcome-message">
         <h3>Welcome to Juggler</h3>
         <p>Start a conversation with any AI provider. You can switch providers mid-conversation while preserving context.</p>
-        <div class="provider-stats">
-          <div v-for="provider in availableProviders" :key="provider.id" class="provider-stat">
+        
+        <!-- Show available providers if any -->
+        <div v-if="availableProviders && availableProviders.length > 0" class="provider-stats">
+          <div v-for="provider in availableProviders" :key="provider.name" class="provider-stat">
             <div class="provider-name">{{ provider.name }}</div>
             <div class="provider-models">{{ provider.models.length }} models</div>
-            <div v-if="provider.latencyMs" class="provider-latency">{{ provider.latencyMs }}ms</div>
           </div>
         </div>
       </div>
 
-      <div v-if="activeConversation" class="messages-list">
-        <MessageBubble
-          v-for="message in activeConversation.messages"
-          :key="message.id"
-          :message="message"
-          :showMetadata="true"
-        />
+      <!-- Messages List -->
+      <div v-if="currentSession && currentSession.messages" class="messages-list">
+        <div v-for="message in currentSession.messages" :key="message.id" class="message-bubble" :class="`message-${message.role}`">
+          <div class="message-content">{{ message.content }}</div>
+          <div class="message-meta">
+            {{ message.role }} • {{ formatTime(message.timestamp) }}
+            <span v-if="message.provider"> • {{ message.provider }}</span>
+            <span v-if="message.model"> • {{ formatModelName(message.model) }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- Loading indicator -->
@@ -61,7 +74,7 @@
           <span></span>
           <span></span>
         </div>
-        <span>{{ currentProviderData?.name || currentProvider }} is thinking...</span>
+        <span>{{ currentProvider }} is thinking...</span>
       </div>
     </div>
 
@@ -91,16 +104,13 @@
       
       <div class="input-footer">
         <div class="current-model">
-          <span v-if="currentProviderData">
-            {{ currentProviderData.name }} • {{ currentModel }}
+          <span v-if="currentProvider && currentModel">
+            {{ currentProvider }} • {{ formatModelName(currentModel) }}
           </span>
         </div>
         
-        <div class="conversation-stats" v-if="activeConversation">
-          <span>{{ activeConversation.messages.length }} messages</span>
-          <span v-if="activeConversation.totalTokens > 0">
-            • {{ activeConversation.totalTokens }} tokens
-          </span>
+        <div class="conversation-stats" v-if="currentSession">
+          <span>{{ currentSession.messages?.length || 0 }} messages</span>
         </div>
       </div>
     </div>
@@ -111,23 +121,25 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chatStore'
-import MessageBubble from './MessageBubble.vue'
-import ProviderSelector from './ProviderSelector.vue'
+
+console.log('ChatInterface component loading...')
 
 const chatStore = useChatStore()
+console.log('ChatStore loaded:', chatStore)
 
-// Store reactive references
+// Store reactive references - matching actual store properties
 const {
-  activeConversation,
+  currentSession,
   availableProviders,
   currentProvider,
   currentModel,
-  currentProviderData,
   isLoading,
   error,
-  connectionStatus,
-  hasHealthyProviders,
+  providers,
+  isInitialized,
 } = storeToRefs(chatStore)
+
+console.log('Store refs created')
 
 // Local reactive state
 const inputMessage = ref('')
@@ -135,10 +147,26 @@ const messagesContainer = ref<HTMLElement>()
 const textareaRef = ref<HTMLTextAreaElement>()
 
 // Computed properties
+const hasHealthyProviders = computed(() => {
+  return availableProviders.value && availableProviders.value.length > 0
+})
+
+const currentProviderModels = computed(() => {
+  if (!providers.value || !currentProvider.value) return []
+  const provider = providers.value[currentProvider.value as keyof typeof providers.value]
+  return provider?.models || []
+})
+
 const canSend = computed(() => {
   return inputMessage.value.trim().length > 0 && 
          !isLoading.value && 
          hasHealthyProviders.value
+})
+
+const connectionStatus = computed(() => {
+  if (!providers.value) return 'disconnected'
+  if (isLoading.value) return 'connecting'
+  return hasHealthyProviders.value ? 'connected' : 'disconnected'
 })
 
 const connectionStatusClass = computed(() => {
@@ -160,6 +188,7 @@ const connectionStatusText = computed(() => {
 
 // Methods
 async function sendMessage() {
+  console.log('Sending message:', inputMessage.value)
   if (!canSend.value) return
 
   const message = inputMessage.value.trim()
@@ -181,16 +210,41 @@ function handleKeyDown(event: KeyboardEvent) {
   }
 }
 
-async function handleProviderChange(providerId: string, modelId?: string) {
-  await chatStore.switchProvider({
-    targetProvider: providerId,
-    targetModel: modelId,
-    preserveContext: true,
-  })
+function handleProviderChange(providerId: string) {
+  console.log('Switching provider to:', providerId)
+  chatStore.switchProvider(providerId)
+  
+  // Set first available model for new provider
+  const models = currentProviderModels.value
+  if (models.length > 0 && !models.includes(currentModel.value)) {
+    currentModel.value = models[0]
+    chatStore.currentModel = models[0]
+  }
+}
+
+function handleModelChange(modelId: string) {
+  console.log('Switching model to:', modelId)
+  chatStore.currentModel = modelId
+}
+
+function formatModelName(model: string): string {
+  // Make model names more readable
+  const modelNames: Record<string, string> = {
+    'llama3:8b': 'Llama 3 (8B)',
+    'llama3:8b-gpu': 'Llama 3 GPU (8B)',
+    'llama-3.1-70b-versatile': 'Llama 3.1 (70B)',
+    'llama-3.1-8b-instant': 'Llama 3.1 Instant (8B)',
+    'mixtral-8x7b-32768': 'Mixtral (8x7B)',
+    'nomic-embed-text:latest': 'Nomic Embed Text',
+    'gemini-pro': 'Gemini Pro',
+    'gemini-pro-vision': 'Gemini Pro Vision',
+    'gemma2-9b-it': 'Gemma 2 (9B)'
+  }
+  return modelNames[model] || model
 }
 
 function clearError() {
-  chatStore.clearError()
+  chatStore.error = null
 }
 
 async function scrollToBottom() {
@@ -198,6 +252,11 @@ async function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
+}
+
+function formatTime(timestamp: Date | string): string {
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+  return date.toLocaleTimeString()
 }
 
 // Auto-resize textarea
@@ -213,13 +272,21 @@ watch(inputMessage, () => {
   autoResizeTextarea()
 })
 
-watch(() => activeConversation.value?.messages.length, () => {
+watch(() => currentSession.value?.messages?.length, () => {
   scrollToBottom()
 })
 
 // Lifecycle
 onMounted(async () => {
-  await chatStore.initialize()
+  console.log('ChatInterface mounted, initializing store...')
+  try {
+    await chatStore.initialize()
+    console.log('Store initialized successfully')
+    console.log('Providers:', providers.value)
+    console.log('Available:', availableProviders.value)
+  } catch (err) {
+    console.error('Failed to initialize:', err)
+  }
   await scrollToBottom()
 })
 </script>
@@ -263,6 +330,38 @@ onMounted(async () => {
 
 .status-disconnected {
   color: #dc2626;
+}
+
+.provider-selector-wrapper {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.selector-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.selector-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.selector-group select {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.no-providers {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .error-banner {
@@ -329,14 +428,39 @@ onMounted(async () => {
   color: #6b7280;
 }
 
-.provider-latency {
-  font-size: 0.75rem;
-  color: #9ca3af;
-}
-
 .messages-list {
   max-width: 800px;
   margin: 0 auto;
+}
+
+.message-bubble {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  max-width: 70%;
+}
+
+.message-user {
+  background: #3b82f6;
+  color: white;
+  margin-left: auto;
+  text-align: right;
+}
+
+.message-assistant {
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.message-content {
+  margin-bottom: 0.25rem;
+  white-space: pre-wrap;
+}
+
+.message-meta {
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .loading-indicator {
