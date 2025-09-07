@@ -3,9 +3,9 @@
  * Authentication Service for Juggler Frontend
  */
 
-// frontend/src/services/auth.service.ts
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import config from '@/config';
 
 // Type imports
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
@@ -35,15 +35,15 @@ interface UserRegistration extends UserCredentials {
 }
 
 class AuthService {
-  private readonly TOKEN_KEY = 'juggler_access_token';
-  private readonly REFRESH_TOKEN_KEY = 'juggler_refresh_token';
+  private readonly TOKEN_KEY = config.AUTH_TOKEN_KEY;
+  private readonly REFRESH_TOKEN_KEY = config.REFRESH_TOKEN_KEY;
   private readonly USER_KEY = 'juggler_user';
   private axiosInstance: AxiosInstance;
   private refreshTokenTimeout?: number;
 
-  constructor(baseURL: string = 'http://localhost:8000') {
+  constructor() {
     this.axiosInstance = axios.create({
-      baseURL,
+      baseURL: config.API_URL,
       headers: {
         'Content-Type': 'application/json',
       },

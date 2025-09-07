@@ -2,6 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import config from '@/config'
 import type { 
   ChatSession, 
   Message, 
@@ -10,8 +11,6 @@ import type {
   RefreshResponse,
   RefreshAllResponse 
 } from '@/types/chat'
-
-const API_BASE = 'http://localhost:8000/api'
 
 export const useChatStore = defineStore('chat', () => {
   // State
@@ -50,7 +49,7 @@ export const useChatStore = defineStore('chat', () => {
   function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' }
     
-    const token = localStorage.getItem('juggler_access_token')
+    const token = localStorage.getItem(config.AUTH_TOKEN_KEY)
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
@@ -71,7 +70,7 @@ export const useChatStore = defineStore('chat', () => {
   // Authentication
   async function login(username: string, password: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch(`${config.API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -111,7 +110,7 @@ export const useChatStore = defineStore('chat', () => {
       console.log('Fetching providers...')
       
       // For status endpoint, we don't need auth (it should be public)
-      const response = await fetch(`${API_BASE}/providers/status`)
+      const response = await fetch(`${config.API_BASE}/providers/status`)
 
       if (!response.ok) {
         throw new Error(`Failed to fetch providers: ${response.statusText}`)
@@ -142,7 +141,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       console.log(`Refreshing models for ${providerName}...`)
       
-      const response = await fetch(`${API_BASE}/providers/${providerName}/refresh`, {
+      const response = await fetch(`${config.API_BASE}/providers/${providerName}/refresh`, {
         method: 'POST',
         headers: getAuthHeaders()
       })
@@ -177,7 +176,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       console.log('Refreshing all providers...')
       
-      const response = await fetch(`${API_BASE}/providers/refresh-all`, {
+      const response = await fetch(`${config.API_BASE}/providers/refresh-all`, {
         method: 'POST',
         headers: getAuthHeaders()
       })
@@ -266,7 +265,7 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       // Send to API
-      const response = await fetch(`${API_BASE}/chat/send`, {
+      const response = await fetch(`${config.API_BASE}/chat/send`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -337,7 +336,7 @@ export const useChatStore = defineStore('chat', () => {
   // Conversation management
   async function loadConversations(): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE}/chat/conversations`, {
+      const response = await fetch(`${config.API_BASE}/chat/conversations`, {
         headers: getAuthHeaders()
       })
 
@@ -369,7 +368,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadConversation(conversationId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE}/chat/conversation/${conversationId}`, {
+      const response = await fetch(`${config.API_BASE}/chat/conversation/${conversationId}`, {
         headers: getAuthHeaders()
       })
 
