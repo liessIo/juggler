@@ -1,18 +1,18 @@
 # backend/app/models/__init__.py
 
 """
-Models package initialization - using existing comprehensive models
+Models package initialization - fixed imports
 """
 
-# Use your existing models structure
+# Import Base first from security_models
 from .security_models import (
+    Base,
     User,
     UserSession, 
     APIKey,
     AuditLog,
     AuditEventType,
-    Conversation,
-    Base
+    Conversation
 )
 
 from .chat_models import (
@@ -21,10 +21,14 @@ from .chat_models import (
     ChatRequestModel,
     ChatResponseModel,
     ConversationModel,
-    ProviderInfoModel
+    ProviderInfoModel,
+    ParallelChatRequest,
+    ParallelChatResponse,
+    ProviderSwitchRequest,
+    HealthCheckResponse
 )
 
-# Keep auth utilities separate for the refactored auth router
+# Auth utilities - these need to be imported separately
 from .auth_utils import (
     UserCreate,
     UserLogin, 
@@ -54,6 +58,10 @@ __all__ = [
     "ChatResponseModel",
     "ConversationModel",
     "ProviderInfoModel",
+    "ParallelChatRequest",
+    "ParallelChatResponse", 
+    "ProviderSwitchRequest",
+    "HealthCheckResponse",
     
     # Auth utilities
     "UserCreate",

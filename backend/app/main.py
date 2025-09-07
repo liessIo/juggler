@@ -5,6 +5,14 @@ Juggler API - Clean and minimal main.py
 Routes and app configuration only
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add backend directory to Python path for imports
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import logging
@@ -77,4 +85,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

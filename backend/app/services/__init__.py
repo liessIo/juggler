@@ -4,7 +4,7 @@
 Services package initialization
 """
 
-from .provider_service import provider_service
 from .chat_service import chat_service
+from .provider_service import provider_service
 
-__all__ = ["provider_service", "chat_service"]
+__all__ = ["chat_service", "provider_service"]

@@ -95,7 +95,8 @@ function checkLoginStatus() {
   const user = authService.getCurrentUser();
   if (user) {
     isLoggedIn.value = true;
-    currentUser.value = user.sub || user.username || 'Unknown';
+    // Use 'sub' (subject) or 'user_id' since 'username' is not available in DecodedToken
+    currentUser.value = user.sub || user.user_id || 'Unknown';
   }
 }
 

@@ -4,94 +4,106 @@
 Chat service for handling AI provider interactions
 """
 
-import logging
-from fastapi import HTTPException
+import asyncio
+import time
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
 
-import ollama
-from groq import Groq
-import google.generativeai as genai
+from app.providers.ollama_adapter import OllamaAdapter
+from app.providers.groq_adapter import GroqAdapter  
+from app.providers.gemini_adapter import GeminiAdapter
+from app.providers.base import ProviderStatus, CanonicalMessage, MessageRole
 
-from app.config import settings
-
-logger = logging.getLogger(__name__)
+@dataclass
+class ChatServiceResponse:
+    content: str
+    provider: str
+    model: str
+    latency_ms: int
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 class ChatService:
-    """Service for handling chat interactions with AI providers"""
+    """Service for managing chat interactions with AI providers"""
     
     def __init__(self):
-        self.groq_client = None
+        self.providers: Dict[str, Any] = {}
+        self.initialized = False
     
-    def initialize(self):
-        """Initialize chat service clients"""
-        try:
-            if settings.GROQ_API_KEY:
-                self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
-        except Exception as e:
-            logger.warning(f"Could not initialize Groq client: {e}")
-        
-        if settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-    
-    async def get_response(self, provider: str, model: str | None, prompt: str) -> str:
-        """Get response from specified provider"""
-        if provider == "ollama":
-            return await self._get_ollama_response(prompt, model or "llama3:8b")
-        elif provider == "groq":
-            return await self._get_groq_response(prompt, model or "llama-3.1-8b-instant")
-        elif provider == "gemini":
-            return await self._get_gemini_response(prompt, model or "gemini-pro")
-        else:
-            raise HTTPException(status_code=400, detail="Invalid provider")
-    
-    async def _get_ollama_response(self, prompt: str, model: str) -> str:
-        """Get response from Ollama"""
-        try:
-            client = ollama.Client(host=settings.OLLAMA_BASE_URL)
-            response = client.chat(
-                model=model,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return response["message"]["content"]
-        except Exception as e:
-            logger.error(f"Ollama error: {e}")
-            raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
-
-    async def _get_groq_response(self, prompt: str, model: str) -> str:
-        """Get response from Groq"""
-        if not self.groq_client:
-            raise HTTPException(status_code=500, detail="Groq API key not configured")
+    async def initialize(self):
+        """Initialize chat service and providers"""
+        if self.initialized:
+            return
         
         try:
-            chat_completion = self.groq_client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model,
-            )
+            # Import config with proper path
+            from app.config import settings
             
-            response = chat_completion.choices[0].message.content if chat_completion.choices else None
+            # Initialize Ollama (always try local)
+            try:
+                ollama = OllamaAdapter(settings.OLLAMA_BASE_URL)
+                if await ollama.initialize():
+                    self.providers["ollama"] = ollama
+                    print("✅ Ollama adapter initialized")
+            except Exception as e:
+                print(f"❌ Failed to initialize Ollama: {e}")
             
-            if not response or response.strip() == "":
-                logger.warning(f"Empty response from Groq for model {model}")
-                return f"Groq returned empty response. Model: {model} might be having issues. Please try another model."
+            # Initialize Groq if API key provided
+            try:
+                if settings.GROQ_API_KEY:
+                    groq = GroqAdapter(settings.GROQ_API_KEY)
+                    if await groq.initialize():
+                        self.providers["groq"] = groq
+                        print("✅ Groq adapter initialized")
+                else:
+                    print("⚠️ Groq API key not provided")
+            except Exception as e:
+                print(f"❌ Failed to initialize Groq: {e}")
             
-            return response
+            # Initialize Gemini if API key provided
+            try:
+                if settings.GEMINI_API_KEY:
+                    gemini = GeminiAdapter(settings.GEMINI_API_KEY)
+                    if await gemini.initialize():
+                        self.providers["gemini"] = gemini
+                        print("✅ Gemini adapter initialized")
+                else:
+                    print("⚠️ Gemini API key not provided")
+            except Exception as e:
+                print(f"❌ Failed to initialize Gemini: {e}")
+            
+            self.initialized = True
+            print(f"🚀 Chat service initialized with {len(self.providers)} providers")
             
         except Exception as e:
-            logger.error(f"Groq error with model {model}: {e}")
-            raise HTTPException(status_code=500, detail=f"Groq error: {str(e)}")
-
-    async def _get_gemini_response(self, prompt: str, model_name: str) -> str:
-        """Get response from Gemini"""
-        if not settings.GEMINI_API_KEY:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+            print(f"💥 Chat service initialization failed: {e}")
+            self.initialized = True  # Mark as initialized to prevent loops
+    
+    async def get_response(self, provider: str, model: Optional[str], prompt: str) -> str:
+        """Get response from specified AI provider"""
+        if not self.initialized:
+            await self.initialize()
         
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
+        if provider not in self.providers:
+            available_providers = list(self.providers.keys())
+            raise ValueError(f"Provider '{provider}' not available. Available: {available_providers}")
+        
+        provider_instance = self.providers[provider]
+        
+        # Create simple message for context package
+        messages = [CanonicalMessage(role=MessageRole.USER, content=prompt)]
+        
+        # Select model if not provided
+        if not model and provider_instance.models:
+            model = provider_instance.models[0].model_id
+        elif not model:
+            raise ValueError(f"No models available for provider '{provider}'")
+        
+        # Create context package and send message
+        context_package = provider_instance.create_context_package(messages, model, prompt)
+        response = await provider_instance.send_message(context_package, model)
+        
+        return response.message.content
 
-# Global chat service instance
+# Global service instance
 chat_service = ChatService()
-chat_service.initialize()

@@ -1,226 +1,208 @@
 # backend/app/services/provider_service.py
 
 """
-Provider service for managing AI model providers
+Provider service for managing AI providers and their models
 """
 
 import asyncio
-import logging
-from datetime import datetime
-from typing import Dict, List
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 
-import ollama
-from groq import Groq
-import google.generativeai as genai
-
-from app.config import settings
-
-logger = logging.getLogger(__name__)
+from app.providers.ollama_adapter import OllamaAdapter
+from app.providers.groq_adapter import GroqAdapter
+from app.providers.gemini_adapter import GeminiAdapter
+from app.providers.base import ProviderStatus
 
 @dataclass
-class ProviderStatus:
+class ProviderServiceStatus:
     available: bool
     models: List[str]
     last_refresh: datetime
-    error: str = ""
-
-class ModelCache:
-    """Simple cache for provider models"""
-    def __init__(self):
-        self._cache: Dict[str, ProviderStatus] = {}
-        self.TTL = settings.MODEL_CACHE_TTL
-    
-    def get(self, provider: str) -> ProviderStatus:
-        """Get cached provider status"""
-        return self._cache.get(provider, ProviderStatus(False, [], datetime.now()))
-    
-    def set(self, provider: str, status: ProviderStatus) -> None:
-        """Cache provider status"""
-        self._cache[provider] = status
-    
-    def is_expired(self, provider: str) -> bool:
-        """Check if cache is expired"""
-        if provider not in self._cache:
-            return True
-        
-        age = (datetime.now() - self._cache[provider].last_refresh).seconds
-        return age > self.TTL
+    error: Optional[str] = None
 
 class ProviderService:
-    """Service for managing AI providers and their models"""
+    """Service for managing AI providers"""
     
     def __init__(self):
-        self.cache = ModelCache()
-        self.groq_client = None
+        self.providers: Dict[str, any] = {}
+        self.status_cache: Dict[str, ProviderServiceStatus] = {}
+        self.cache_duration = timedelta(minutes=5)  # Cache for 5 minutes
+        self.initialized = False
     
-    async def initialize(self) -> None:
-        """Initialize provider clients"""
-        try:
-            if settings.GROQ_API_KEY:
-                self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
-        except Exception as e:
-            logger.warning(f"Could not initialize Groq client: {e}")
-        
-        if settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-        
-        # Pre-load models
-        await self.refresh_all_providers()
-    
-    def _fetch_ollama_models(self) -> List[str]:
-        """Fetch models from Ollama - synchronous"""
-        try:
-            client = ollama.Client(host=settings.OLLAMA_BASE_URL)
-            response = client.list()
-            
-            models: List[str] = []
-            
-            if hasattr(response, 'models'):
-                for model in response.models:
-                    if hasattr(model, 'model') and isinstance(model.model, str):
-                        models.append(model.model)
-            elif isinstance(response, dict) and 'models' in response:
-                for model in response['models']:
-                    if isinstance(model, dict):
-                        name = model.get('name') or model.get('model')
-                        if isinstance(name, str):
-                            models.append(name)
-            
-            return models
-        except Exception as e:
-            logger.error(f"Error fetching Ollama models: {e}")
-            return []
-    
-    def _fetch_groq_models(self) -> List[str]:
-        """Fetch models from Groq - synchronous"""
-        if not self.groq_client:
-            return []
+    async def initialize(self):
+        """Initialize provider service"""
+        if self.initialized:
+            return
         
         try:
-            response = self.groq_client.models.list()
-            models: List[str] = []
+            # Import config with proper path
+            from app.config import settings
             
-            if hasattr(response, 'data'):
-                for model in response.data:
-                    if hasattr(model, 'id') and isinstance(model.id, str):
-                        models.append(model.id)
+            # Initialize Ollama
+            try:
+                ollama = OllamaAdapter(settings.OLLAMA_BASE_URL)
+                self.providers["ollama"] = ollama
+                print("Ollama adapter registered")
+            except Exception as e:
+                print(f"Failed to register Ollama: {e}")
             
-            if not models:
-                # Fallback to known models
-                models = [
-                    "llama-3.1-70b-versatile",
-                    "llama-3.1-8b-instant",
-                    "mixtral-8x7b-32768",
-                    "gemma2-9b-it"
-                ]
+            # Initialize Groq if API key provided
+            try:
+                if settings.GROQ_API_KEY:
+                    groq = GroqAdapter(settings.GROQ_API_KEY)
+                    self.providers["groq"] = groq
+                    print("Groq adapter registered")
+                else:
+                    print("Groq API key not provided")
+            except Exception as e:
+                print(f"Failed to register Groq: {e}")
             
-            return models
+            # Initialize Gemini if API key provided
+            try:
+                if settings.GEMINI_API_KEY:
+                    gemini = GeminiAdapter(settings.GEMINI_API_KEY)
+                    self.providers["gemini"] = gemini
+                    print("Gemini adapter registered")
+                else:
+                    print("Gemini API key not provided")
+            except Exception as e:
+                print(f"Failed to register Gemini: {e}")
+            
+            self.initialized = True
+            print(f"Provider service initialized with {len(self.providers)} providers")
+            
         except Exception as e:
-            logger.error(f"Error fetching Groq models: {e}")
-            return [
-                "llama-3.1-70b-versatile",
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
-                "gemma2-9b-it"
-            ]
+            print(f"Error initializing provider service: {e}")
+            self.initialized = True  # Mark as initialized even if some fail
     
-    def _fetch_gemini_models(self) -> List[str]:
-        """Fetch models from Gemini - synchronous"""
-        if not settings.GEMINI_API_KEY:
-            return []
+    async def get_all_providers(self) -> Dict[str, ProviderServiceStatus]:
+        """Get status of all providers"""
+        if not self.initialized:
+            await self.initialize()
         
-        try:
-            models_list = genai.list_models()
-            models: List[str] = []
+        # Check if we need to refresh cache
+        now = datetime.now()
+        results = {}
+        
+        for provider_name, provider_instance in self.providers.items():
+            # Check cache first
+            if (provider_name in self.status_cache and 
+                now - self.status_cache[provider_name].last_refresh < self.cache_duration):
+                results[provider_name] = self.status_cache[provider_name]
+                continue
             
-            for model in models_list:
-                if hasattr(model, 'name') and hasattr(model, 'supported_generation_methods'):
-                    name = model.name.split('/')[-1]
-                    if isinstance(name, str) and 'generateContent' in model.supported_generation_methods:
-                        models.append(name)
-            
-            if not models:
-                models = ["gemini-pro", "gemini-pro-vision"]
-            
-            return models
-        except Exception as e:
-            logger.error(f"Error fetching Gemini models: {e}")
-            return ["gemini-pro", "gemini-pro-vision"]
+            # Refresh provider status
+            try:
+                status = await self._check_provider_status(provider_name, provider_instance)
+                self.status_cache[provider_name] = status
+                results[provider_name] = status
+            except Exception as e:
+                error_status = ProviderServiceStatus(
+                    available=False,
+                    models=[],
+                    last_refresh=now,
+                    error=str(e)
+                )
+                self.status_cache[provider_name] = error_status
+                results[provider_name] = error_status
+        
+        return results
     
-    async def refresh_provider(self, provider: str) -> ProviderStatus:
+    async def refresh_provider(self, provider_name: str) -> ProviderServiceStatus:
         """Refresh models for a specific provider"""
-        logger.info(f"Refreshing models for {provider}")
+        if not self.initialized:
+            await self.initialize()
+        
+        if provider_name not in self.providers:
+            raise ValueError(f"Provider '{provider_name}' not found")
+        
+        provider_instance = self.providers[provider_name]
         
         try:
-            if provider == "ollama":
-                models = await asyncio.to_thread(self._fetch_ollama_models)
-            elif provider == "groq":
-                models = await asyncio.to_thread(self._fetch_groq_models)
-            elif provider == "gemini":
-                models = await asyncio.to_thread(self._fetch_gemini_models)
-            else:
-                models = []
-            
-            status = ProviderStatus(
-                available=len(models) > 0,
-                models=models,
-                last_refresh=datetime.now()
-            )
-            
-            self.cache.set(provider, status)
-            logger.info(f"Refreshed {len(models)} models for {provider}")
+            # Force refresh
+            status = await self._check_provider_status(provider_name, provider_instance, force_refresh=True)
+            self.status_cache[provider_name] = status
             return status
-            
         except Exception as e:
-            error_msg = f"Failed to refresh {provider}: {str(e)}"
-            logger.error(error_msg)
-            
-            status = ProviderStatus(
+            error_status = ProviderServiceStatus(
                 available=False,
                 models=[],
                 last_refresh=datetime.now(),
-                error=error_msg
+                error=str(e)
             )
-            self.cache.set(provider, status)
-            return status
+            self.status_cache[provider_name] = error_status
+            return error_status
     
-    async def refresh_all_providers(self) -> Dict[str, ProviderStatus]:
+    async def refresh_all_providers(self) -> Dict[str, ProviderServiceStatus]:
         """Refresh all providers"""
-        providers = ["ollama", "groq", "gemini"]
-        results = await asyncio.gather(
-            *[self.refresh_provider(p) for p in providers],
-            return_exceptions=True
-        )
+        if not self.initialized:
+            await self.initialize()
         
-        status_dict = {}
-        for i, result in enumerate(results):
-            provider = providers[i]
-            if isinstance(result, Exception):
-                status_dict[provider] = ProviderStatus(
+        results = {}
+        
+        # Refresh all providers concurrently
+        tasks = []
+        for provider_name in self.providers.keys():
+            task = asyncio.create_task(self.refresh_provider(provider_name))
+            tasks.append((provider_name, task))
+        
+        # Wait for all to complete
+        for provider_name, task in tasks:
+            try:
+                status = await task
+                results[provider_name] = status
+            except Exception as e:
+                results[provider_name] = ProviderServiceStatus(
                     available=False,
                     models=[],
                     last_refresh=datetime.now(),
-                    error=str(result)
+                    error=str(e)
+                )
+        
+        return results
+    
+    async def _check_provider_status(self, provider_name: str, provider_instance, force_refresh: bool = False) -> ProviderServiceStatus:
+        """Check status of a provider"""
+        now = datetime.now()
+        
+        try:
+            # Initialize provider if needed
+            if not hasattr(provider_instance, '_status') or provider_instance._status == ProviderStatus.UNKNOWN:
+                await provider_instance.initialize()
+            
+            # Health check
+            health_status = await provider_instance.health_check()
+            
+            if health_status == ProviderStatus.HEALTHY:
+                # Get models
+                if force_refresh or not provider_instance.models:
+                    models = await provider_instance.get_available_models()
+                    provider_instance._models = models
+                
+                model_names = [model.model_id for model in provider_instance.models]
+                
+                return ProviderServiceStatus(
+                    available=True,
+                    models=model_names,
+                    last_refresh=now,
+                    error=None
                 )
             else:
-                status_dict[provider] = result
-        
-        return status_dict
-    
-    async def get_provider_status(self, provider: str, force_refresh: bool = False) -> ProviderStatus:
-        """Get provider status with optional refresh"""
-        if force_refresh or self.cache.is_expired(provider):
-            return await self.refresh_provider(provider)
-        return self.cache.get(provider)
-    
-    async def get_all_providers(self, force_refresh: bool = False) -> Dict[str, ProviderStatus]:
-        """Get status of all providers"""
-        if force_refresh:
-            return await self.refresh_all_providers()
-        
-        providers = ["ollama", "groq", "gemini"]
-        return {p: self.cache.get(p) for p in providers}
+                return ProviderServiceStatus(
+                    available=False,
+                    models=[],
+                    last_refresh=now,
+                    error=f"Provider health check failed: {health_status.value}"
+                )
+                
+        except Exception as e:
+            return ProviderServiceStatus(
+                available=False,
+                models=[],
+                last_refresh=now,
+                error=str(e)
+            )
 
-# Global provider service instance
+# Global service instance
 provider_service = ProviderService()

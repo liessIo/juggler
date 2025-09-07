@@ -263,3 +263,36 @@ def setup_database_with_test_user():
 if __name__ == "__main__":
     # Run this script directly to setup database
     setup_database_with_test_user()
+
+
+# Add these missing functions to your existing app/database.py
+
+# Add this function to handle the specific call pattern from auth.py router:
+def create_user(username: str, email: str, password: str, full_name: str = None) -> dict:
+    """Create a new user - updated signature to match router expectations"""
+    with get_db_context() as db:
+        # Check if user exists
+        existing = db.query(User).filter(
+            (User.username == username) | (User.email == email)
+        ).first()
+        
+        if existing:
+            raise ValueError("User already exists")
+        
+        # Create new user
+        user = User(
+            username=username,
+            email=email,
+            hashed_password=pwd_context.hash(password),
+            full_name=full_name  # Added full_name parameter
+        )
+        db.add(user)
+        db.commit()
+        
+        # Return user data as dict (not the object)
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name
+        }
