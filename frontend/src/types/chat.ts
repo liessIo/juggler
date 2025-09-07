@@ -1,271 +1,192 @@
-/**
- * File: src/types/chat.ts
- * TypeScript type definitions for Juggler Chat Application
- */
+// types/chat.ts
 
-// Core chat message structure
-export interface ChatMessage {
+export interface Message {
   id: string
-  content: string
   role: 'user' | 'assistant' | 'system'
-  provider: string
-  model: string
+  content: string
   timestamp: Date
-  latency_ms?: number
-  tokens?: {
-    input: number
-    output: number
-  }
+  provider?: string
+  model?: string
+  metadata?: Record<string, any>
+}
+
+export interface ChatSession {
+  id: string
+  title: string
+  messages: Message[]
+  createdAt: Date
+  updatedAt: Date
+  metadata?: Record<string, any>
+}
+
+export interface ProviderStatus {
+  available: boolean
+  models: string[]
+  lastRefresh?: Date
   error?: string
 }
 
-// Conversation management
-export interface Conversation {
-  id: string
-  title: string
-  messages: ChatMessage[]
-  createdAt: Date
-  updatedAt: Date
-  currentProvider: string
-  currentModel: string
-  totalTokens: number
+export interface Provider {
+  name: string
+  available: boolean
+  models: string[]
+  lastRefresh?: Date
+  error?: string
 }
 
-// Provider and model definitions
-export interface AIModel {
-  id: string
-  name: string
+export interface RefreshResponse {
+  success: boolean
   provider: string
-  contextWindow: number
-  supportsVision: boolean
-  costPer1MTokens?: number
+  models: string[]
+  count: number
+  refreshed_at: string
+  error?: string
 }
 
-export interface AIProvider {
-  id: string
-  name: string
-  status: 'healthy' | 'degraded' | 'down' | 'not_configured'
-  models: AIModel[]
-  latencyMs?: number
-  description?: string
-  features?: string[]
+export interface RefreshAllResponse {
+  success: boolean
+  providers: Record<string, {
+    success: boolean
+    models: string[]
+    count?: number
+    error?: string
+  }>
+  refreshed_at: string
 }
 
-// API request/response types
 export interface SendMessageRequest {
-  message: string
+  content: string
   provider: string
   model?: string
-  temperature?: number
-  maxTokens?: number
-  conversationId?: string
+  conversation_id?: string
 }
 
 export interface SendMessageResponse {
   response: string
-  provider: string
-  model: string
-  latencyMs: number
-  inputTokens?: number
-  outputTokens?: number
-}
-
-// UI state management
-export interface ChatState {
-  conversations: Conversation[]
-  activeConversationId: string | null
-  providers: AIProvider[]
-  isLoading: boolean
-  error: string | null
-  connectionStatus: 'connected' | 'connecting' | 'disconnected'
-}
-
-export interface UISettings {
-  theme: 'light' | 'dark'
-  showTokenCounts: boolean
-  showLatency: boolean
-  autoScroll: boolean
-  compactMode: boolean
-  preferredProvider: string
-  preferredModel: string
-}
-
-// Context transfer types
-export interface ContextTransferRequest {
-  fromProvider: string
-  toProvider: string
-  conversationId: string
-  preserveMessages: number // How many recent messages to include
-  includeSystemPrompt: boolean
-}
-
-export interface ContextTransferResponse {
-  success: boolean
-  transferredMessages: number
-  summary?: string
-  error?: string
-}
-
-// Provider switching types
-export interface ProviderSwitchOptions {
-  targetProvider: string
-  targetModel?: string
-  preserveContext: boolean
-  contextSummary?: boolean
-}
-
-// Statistics and analytics
-export interface ConversationStats {
-  totalMessages: number
-  totalTokens: number
-  averageLatency: number
-  providerUsage: Record<string, number>
-  modelUsage: Record<string, number>
-  totalCost?: number
-}
-
-export interface ProviderStats {
-  providerId: string
-  totalRequests: number
-  totalTokens: number
-  averageLatency: number
-  errorRate: number
-  uptime: number
-  lastHealthCheck: Date
-}
-
-// Error handling
-export interface APIError {
-  code: string
-  message: string
-  details?: any
-  timestamp: Date
-}
-
-export interface ChatError extends APIError {
+  conversation_id: string
   provider: string
   model?: string
-  conversationId?: string
-  retryable: boolean
+  timestamp: string
 }
 
-// Utility types
-export type MessageRole = 'user' | 'assistant' | 'system'
-export type ProviderStatus = 'healthy' | 'degraded' | 'down' | 'not_configured'
-export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
-
-// Component prop types
-export interface MessageBubbleProps {
-  message: ChatMessage
-  showMetadata?: boolean
-  compact?: boolean
+export interface AuthTokens {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  expires_in: number
 }
 
-export interface ProviderSelectorProps {
-  providers: AIProvider[]
-  selectedProvider: string
-  selectedModel?: string
-  onProviderChange: (provider: string, model?: string) => void
-  disabled?: boolean
+export interface UserCredentials {
+  username: string
+  password: string
 }
 
-export interface ChatInterfaceProps {
-  conversation?: Conversation
-  onSendMessage: (message: string) => void
-  onProviderSwitch: (options: ProviderSwitchOptions) => void
-  isLoading?: boolean
+export interface UserRegistration extends UserCredentials {
+  email: string
 }
 
-// Event types
-export interface MessageSentEvent {
-  message: string
-  provider: string
-  model: string
-  conversationId: string
+export interface ConversationSummary {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+  message_count?: number
 }
 
-export interface MessageReceivedEvent {
-  response: ChatMessage
-  conversationId: string
+export interface ConversationsResponse {
+  conversations: ConversationSummary[]
+  total: number
 }
 
-export interface ProviderSwitchedEvent {
-  fromProvider: string
-  toProvider: string
-  fromModel?: string
-  toModel?: string
-  conversationId: string
-  contextTransferred: boolean
+export interface ConversationDetail {
+  id: string
+  title: string
+  messages: Array<{
+    role: string
+    content: string
+    provider?: string
+    model?: string
+    created_at: string
+  }>
+  created_at: string
 }
 
-export interface ErrorEvent {
-  error: ChatError
-  context?: any
+export interface ApiError {
+  detail: string
+  status_code?: number
 }
 
-// Constants
-export const MESSAGE_ROLES = {
-  USER: 'user' as MessageRole,
-  ASSISTANT: 'assistant' as MessageRole,
-  SYSTEM: 'system' as MessageRole,
-} as const
-
-export const PROVIDER_STATUS = {
-  HEALTHY: 'healthy' as ProviderStatus,
-  DEGRADED: 'degraded' as ProviderStatus,
-  DOWN: 'down' as ProviderStatus,
-  NOT_CONFIGURED: 'not_configured' as ProviderStatus,
-} as const
-
-export const CONNECTION_STATUS = {
-  CONNECTED: 'connected' as ConnectionStatus,
-  CONNECTING: 'connecting' as ConnectionStatus,
-  DISCONNECTED: 'disconnected' as ConnectionStatus,
-} as const
-
-// Helper functions
-export const createMessage = (
-  content: string,
-  role: MessageRole,
-  provider: string,
-  model: string
-): ChatMessage => ({
-  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-  content,
-  role,
-  provider,
-  model,
-  timestamp: new Date(),
-})
-
-export const createConversation = (
-  title: string,
-  provider: string,
-  model: string
-): Conversation => ({
-  id: Date.now().toString(),
-  title,
-  messages: [],
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  currentProvider: provider,
-  currentModel: model,
-  totalTokens: 0,
-})
-
-export const formatTimestamp = (date: Date): string => {
-  return date.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  })
+export interface HealthCheck {
+  status: string
+  timestamp: string
+  version: string
 }
 
-export const getProviderDisplayName = (providerId: string): string => {
-  const displayNames: Record<string, string> = {
-    'ollama': 'Ollama (Local)',
-    'groq': 'Groq',
-    'gemini': 'Google Gemini',
-    'openai': 'OpenAI',
+// Provider-specific model information
+export interface ModelInfo {
+  id: string
+  name: string
+  description?: string
+  context_length?: number
+  capabilities?: string[]
+}
+
+// Enhanced provider status with model details
+export interface EnhancedProviderStatus extends ProviderStatus {
+  models_info?: ModelInfo[]
+  last_error?: string
+  response_time?: number
+  rate_limit?: {
+    requests_per_minute: number
+    current_usage: number
   }
-  return displayNames[providerId] || providerId
 }
+
+// Chat store state interface
+export interface ChatStoreState {
+  sessions: Map<string, ChatSession>
+  currentSessionId: string | null
+  providers: Record<string, ProviderStatus>
+  currentProvider: string
+  currentModel: string
+  isLoading: boolean
+  error: string | null
+  isInitialized: boolean
+  authToken: string | null
+}
+
+// WebSocket message types
+export interface WebSocketMessage {
+  type: 'message' | 'status' | 'error' | 'ping' | 'pong'
+  data: any
+  timestamp: string
+}
+
+export interface StreamingMessage {
+  id: string
+  delta: string
+  finished: boolean
+  metadata?: Record<string, any>
+}
+
+// Configuration types
+export interface AppConfig {
+  apiBase: string
+  wsBase: string
+  maxMessageLength: number
+  maxConversations: number
+  autoSave: boolean
+  theme: 'light' | 'dark' | 'auto'
+}
+
+// Export utility types
+export type ProviderName = 'ollama' | 'groq' | 'gemini' | 'openai' | 'anthropic'
+export type MessageRole = Message['role']
+export type ChatStoreAction = 
+  | 'initialize'
+  | 'sendMessage' 
+  | 'switchProvider'
+  | 'refreshModels'
+  | 'loadConversation'
+  | 'createSession'
+  | 'deleteSession'

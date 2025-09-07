@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 .env
 .env
+
+# Juggler project specifics
+*.db
+/data/
+/logs/

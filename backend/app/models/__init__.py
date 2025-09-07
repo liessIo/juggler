@@ -1,46 +1,68 @@
 # backend/app/models/__init__.py
 
 """
-Models module for Juggler application
-Combines chat models and security models
+Models package initialization - using existing comprehensive models
 """
 
-from sqlalchemy.ext.declarative import declarative_base
-
-# Create the Base class for all models
-Base = declarative_base()
-
-# Import existing chat models
-try:
-    from .chat_models import *
-except ImportError:
-    pass  # chat_models might not have all models yet
-
-# Import security models
+# Use your existing models structure
 from .security_models import (
     User,
-    UserSession,
+    UserSession, 
     APIKey,
     AuditLog,
     AuditEventType,
     Conversation,
+    Base
 )
 
-# Export all models and Base for Alembic
+from .chat_models import (
+    ChatRole,
+    ChatMessageModel,
+    ChatRequestModel,
+    ChatResponseModel,
+    ConversationModel,
+    ProviderInfoModel
+)
+
+# Keep auth utilities separate for the refactored auth router
+from .auth_utils import (
+    UserCreate,
+    UserLogin, 
+    Token,
+    TokenData,
+    get_current_user,
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token
+)
+
 __all__ = [
-    # Base class
-    'Base',
+    # Database models
+    "Base",
+    "User", 
+    "UserSession",
+    "APIKey",
+    "AuditLog", 
+    "AuditEventType",
+    "Conversation",
     
-    # Security models
-    'User',
-    'UserSession',
-    'APIKey',
-    'AuditLog',
-    'AuditEventType',
-    'Conversation',
+    # Pydantic models
+    "ChatRole",
+    "ChatMessageModel", 
+    "ChatRequestModel",
+    "ChatResponseModel",
+    "ConversationModel",
+    "ProviderInfoModel",
     
-    # Add your chat_models exports here if needed
-    # 'Message',
-    # 'ChatSession',
-    # etc.
+    # Auth utilities
+    "UserCreate",
+    "UserLogin",
+    "Token", 
+    "TokenData",
+    "get_current_user",
+    "verify_password",
+    "get_password_hash", 
+    "create_access_token",
+    "create_refresh_token"
 ]
