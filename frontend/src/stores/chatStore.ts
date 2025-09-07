@@ -22,7 +22,6 @@ export const useChatStore = defineStore('chat', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isInitialized = ref(false)
-  const authToken = ref<string | null>(localStorage.getItem('auth_token'))
 
   // Computed
   const currentSession = computed(() => {
@@ -41,13 +40,9 @@ export const useChatStore = defineStore('chat', () => {
       }))
   })
 
-  const isAuthenticated = computed(() => {
-    return !!authToken.value
-  })
-
   // Helper function to get auth headers
-  function getAuthHeaders() {
-    const headers = { 'Content-Type': 'application/json' }
+  function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     
     const token = localStorage.getItem(config.AUTH_TOKEN_KEY)
     if (token) {
@@ -65,43 +60,6 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearError() {
     error.value = null
-  }
-
-  // Authentication
-  async function login(username: string, password: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${config.API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Login failed')
-      }
-
-      const data = await response.json()
-      authToken.value = data.access_token
-      localStorage.setItem('auth_token', data.access_token)
-      
-      // Initialize after successful login
-      await initialize()
-      return true
-    } catch (err: any) {
-      setError(err.message)
-      return false
-    }
-  }
-
-  async function logout() {
-    authToken.value = null
-    localStorage.removeItem('auth_token')
-    sessions.value.clear()
-    currentSessionId.value = null
-    providers.value = {}
-    isInitialized.value = false
-    console.log('Logged out, token cleared')
   }
 
   // Provider management
@@ -405,15 +363,14 @@ export const useChatStore = defineStore('chat', () => {
   // Initialization
   async function initialize(): Promise<void> {
     console.log('Initializing chat store...')
-    console.log('Current auth token:', authToken.value)
-    console.log('Is authenticated:', isAuthenticated.value)
     
     try {
       // Always fetch providers first (status endpoint is public)
       await fetchProviders()
       
-      // Only load conversations if authenticated
-      if (isAuthenticated.value) {
+      // Check if user is authenticated by checking token existence
+      const token = localStorage.getItem(config.AUTH_TOKEN_KEY)
+      if (token) {
         console.log('User authenticated, loading conversations...')
         await loadConversations()
       } else {
@@ -451,18 +408,14 @@ export const useChatStore = defineStore('chat', () => {
     isLoading,
     error,
     isInitialized,
-    authToken,
 
     // Computed
     currentSession,
     availableProviders,
-    isAuthenticated,
 
     // Actions
     setError,
     clearError,
-    login,
-    logout,
     fetchProviders,
     refreshProviderModels,
     refreshAllProviders,
