@@ -43,13 +43,20 @@ async def send_message(
 ):
     """Send a message to AI provider"""
     try:
+        # Ensure user_id is not None
+        if not current_user.user_id:
+            raise HTTPException(status_code=401, detail="Invalid user authentication")
+        
         # Create or get conversation
         if not message.conversation_id:
             conv = create_conversation(
-                user_id=current_user.user_id,
+                user_id=current_user.user_id,  # Now guaranteed to be not None
                 title=message.content[:50]
             )
-            conversation_id = conv.id
+            # Ensure we get the string value, not the column object
+            conversation_id = str(conv.id) if conv.id is not None else ""
+            if not conversation_id:
+                raise HTTPException(status_code=500, detail="Failed to create conversation")
         else:
             conversation_id = message.conversation_id
         
@@ -75,7 +82,7 @@ async def send_message(
             role="assistant",
             content=response,
             provider=message.provider,
-            model=message.model
+            model=model_value  # Use the same model_value we defined above
         )
         
         return {
@@ -93,6 +100,10 @@ async def get_conversations(
     current_user: TokenData = Depends(get_current_user)
 ):
     """Get user's conversations"""
+    # Ensure user_id is not None
+    if not current_user.user_id:
+        raise HTTPException(status_code=401, detail="Invalid user authentication")
+        
     conversations = get_user_conversations(current_user.user_id)
     return {
         "conversations": [

@@ -45,7 +45,9 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_auth_schem
     jwt_alg = _env("JWT_ALGORITHM", "HS256")
     if jwt_secret and jwt and _is_probably_jwt(token):
         try:
-            jwt.decode(token, jwt_secret, algorithms=[jwt_alg])
+            # Ensure jwt_alg is not None - use HS256 as fallback
+            algorithm = jwt_alg if jwt_alg is not None else "HS256"
+            jwt.decode(token, jwt_secret, algorithms=[algorithm])
             return token
         except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT")

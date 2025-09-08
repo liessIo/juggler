@@ -4,9 +4,8 @@
 Models package initialization - fixed imports
 """
 
-# Import Base first from security_models
+# Import Base and models from security_models first
 from .security_models import (
-    Base,
     User,
     UserSession, 
     APIKey,
@@ -42,8 +41,10 @@ from .auth_utils import (
 )
 
 __all__ = [
-    # Database models
+    # Database base
     "Base",
+    
+    # Database models
     "User", 
     "UserSession",
     "APIKey",

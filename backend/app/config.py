@@ -13,6 +13,9 @@ load_dotenv()
 
 class Settings:
     """Application settings"""
+    # General
+    DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
     ALGORITHM: str = "HS256"

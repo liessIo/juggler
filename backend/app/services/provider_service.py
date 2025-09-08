@@ -6,7 +6,7 @@ Provider service for managing AI providers and their models
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from app.providers.ollama_adapter import OllamaAdapter
@@ -25,7 +25,7 @@ class ProviderService:
     """Service for managing AI providers"""
     
     def __init__(self):
-        self.providers: Dict[str, any] = {}
+        self.providers: Dict[str, Any] = {}  # Fixed: use Any instead of any
         self.status_cache: Dict[str, ProviderServiceStatus] = {}
         self.cache_duration = timedelta(minutes=5)  # Cache for 5 minutes
         self.initialized = False

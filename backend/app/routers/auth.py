@@ -31,7 +31,7 @@ async def register(request: Request, user_data: UserCreate):
             username=user_data.username,
             email=user_data.email,
             password=user_data.password,
-            full_name=user_data.full_name
+            full_name=user_data.full_name or ""  # Convert None to empty string
         )
         
         access_token = create_access_token(
