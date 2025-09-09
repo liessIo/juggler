@@ -25,6 +25,14 @@ cors:
   max_age: 86400
   # Allowed origin comes from env FRONTEND_ORIGIN (default http://localhost:5173)
 
+security:
+  secret_key: null  # For full JWT stack. For self-hosted MVP, set JUGGLER_API_TOKEN in .env
+  session_lifetime: 86400
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+
 providers:
   ollama:
     enabled: true

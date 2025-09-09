@@ -154,7 +154,15 @@ def create_conversation(user_id: str, title: str = None) -> Conversation:
         db.add(conv)
         db.commit()
         db.refresh(conv)
-        return conv
+        
+        # Return a detached object with the ID populated
+        return Conversation(
+            id=conv.id,
+            user_id=conv.user_id,
+            title=conv.title,
+            created_at=conv.created_at,
+            updated_at=conv.updated_at
+        )
 
 def get_user_conversations(user_id: str):
     """Get all conversations for a user"""

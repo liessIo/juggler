@@ -2,6 +2,7 @@
 
 """
 Provider service for managing AI providers and their models
+Now integrated with encrypted API key storage
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from app.providers.ollama_adapter import OllamaAdapter
 from app.providers.groq_adapter import GroqAdapter
 from app.providers.gemini_adapter import GeminiAdapter
 from app.providers.base import ProviderStatus
+from app.models.security_models import get_decrypted_api_key
 
 @dataclass
 class ProviderServiceStatus:
@@ -22,24 +24,36 @@ class ProviderServiceStatus:
     error: Optional[str] = None
 
 class ProviderService:
-    """Service for managing AI providers"""
+    """Service for managing AI providers with encrypted key support"""
     
     def __init__(self):
-        self.providers: Dict[str, Any] = {}  # Fixed: use Any instead of any
+        self.providers: Dict[str, Any] = {}
         self.status_cache: Dict[str, ProviderServiceStatus] = {}
         self.cache_duration = timedelta(minutes=5)  # Cache for 5 minutes
         self.initialized = False
+        self.current_user_id: Optional[str] = None
     
-    async def initialize(self):
-        """Initialize provider service"""
-        if self.initialized:
+    def set_user_context(self, user_id: str):
+        """Set the current user context for API key retrieval"""
+        self.current_user_id = user_id
+        # Clear providers when user changes to force re-initialization
+        self.providers.clear()
+        self.status_cache.clear()
+        self.initialized = False
+    
+    async def initialize(self, user_id: Optional[str] = None):
+        """Initialize provider service with user-specific API keys"""
+        if user_id:
+            self.set_user_context(user_id)
+            
+        if self.initialized and self.current_user_id:
             return
         
         try:
-            # Import config with proper path
+            # Import config for fallback values
             from app.config import settings
             
-            # Initialize Ollama
+            # Initialize Ollama (uses base URL, no API key needed)
             try:
                 ollama = OllamaAdapter(settings.OLLAMA_BASE_URL)
                 self.providers["ollama"] = ollama
@@ -47,38 +61,62 @@ class ProviderService:
             except Exception as e:
                 print(f"Failed to register Ollama: {e}")
             
-            # Initialize Groq if API key provided
+            # Initialize Groq with encrypted API key
             try:
-                if settings.GROQ_API_KEY:
-                    groq = GroqAdapter(settings.GROQ_API_KEY)
-                    self.providers["groq"] = groq
-                    print("Groq adapter registered")
+                if self.current_user_id:
+                    # Try to get user's encrypted API key
+                    try:
+                        groq_key = get_decrypted_api_key(self.current_user_id, "groq")
+                        groq = GroqAdapter(groq_key)
+                        self.providers["groq"] = groq
+                        print("Groq adapter registered with user API key")
+                    except ValueError:
+                        print("No Groq API key found for user")
                 else:
-                    print("Groq API key not provided")
+                    # Fallback to environment variable for system-level operations
+                    if settings.GROQ_API_KEY:
+                        groq = GroqAdapter(settings.GROQ_API_KEY)
+                        self.providers["groq"] = groq
+                        print("Groq adapter registered with system API key")
+                    else:
+                        print("No Groq API key available")
             except Exception as e:
                 print(f"Failed to register Groq: {e}")
             
-            # Initialize Gemini if API key provided
+            # Initialize Gemini with encrypted API key
             try:
-                if settings.GEMINI_API_KEY:
-                    gemini = GeminiAdapter(settings.GEMINI_API_KEY)
-                    self.providers["gemini"] = gemini
-                    print("Gemini adapter registered")
+                if self.current_user_id:
+                    # Try to get user's encrypted API key
+                    try:
+                        gemini_key = get_decrypted_api_key(self.current_user_id, "gemini")
+                        gemini = GeminiAdapter(gemini_key)
+                        self.providers["gemini"] = gemini
+                        print("Gemini adapter registered with user API key")
+                    except ValueError:
+                        print("No Gemini API key found for user")
                 else:
-                    print("Gemini API key not provided")
+                    # Fallback to environment variable for system-level operations
+                    if hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
+                        gemini = GeminiAdapter(settings.GEMINI_API_KEY)
+                        self.providers["gemini"] = gemini
+                        print("Gemini adapter registered with system API key")
+                    else:
+                        print("No Gemini API key available")
             except Exception as e:
                 print(f"Failed to register Gemini: {e}")
             
             self.initialized = True
-            print(f"Provider service initialized with {len(self.providers)} providers")
+            print(f"Provider service initialized with {len(self.providers)} providers for user {self.current_user_id}")
             
         except Exception as e:
             print(f"Error initializing provider service: {e}")
             self.initialized = True  # Mark as initialized even if some fail
     
-    async def get_all_providers(self) -> Dict[str, ProviderServiceStatus]:
-        """Get status of all providers"""
-        if not self.initialized:
+    async def get_all_providers(self, user_id: Optional[str] = None) -> Dict[str, ProviderServiceStatus]:
+        """Get status of all providers for a specific user"""
+        if user_id and user_id != self.current_user_id:
+            await self.initialize(user_id)
+        elif not self.initialized:
             await self.initialize()
         
         # Check if we need to refresh cache
@@ -109,13 +147,15 @@ class ProviderService:
         
         return results
     
-    async def refresh_provider(self, provider_name: str) -> ProviderServiceStatus:
+    async def refresh_provider(self, provider_name: str, user_id: Optional[str] = None) -> ProviderServiceStatus:
         """Refresh models for a specific provider"""
-        if not self.initialized:
+        if user_id and user_id != self.current_user_id:
+            await self.initialize(user_id)
+        elif not self.initialized:
             await self.initialize()
         
         if provider_name not in self.providers:
-            raise ValueError(f"Provider '{provider_name}' not found")
+            raise ValueError(f"Provider '{provider_name}' not found or not accessible for user {self.current_user_id}")
         
         provider_instance = self.providers[provider_name]
         
@@ -134,9 +174,11 @@ class ProviderService:
             self.status_cache[provider_name] = error_status
             return error_status
     
-    async def refresh_all_providers(self) -> Dict[str, ProviderServiceStatus]:
-        """Refresh all providers"""
-        if not self.initialized:
+    async def refresh_all_providers(self, user_id: Optional[str] = None) -> Dict[str, ProviderServiceStatus]:
+        """Refresh all providers for a specific user"""
+        if user_id and user_id != self.current_user_id:
+            await self.initialize(user_id)
+        elif not self.initialized:
             await self.initialize()
         
         results = {}
@@ -161,6 +203,18 @@ class ProviderService:
                 )
         
         return results
+    
+    async def get_provider_for_user(self, provider_name: str, user_id: str):
+        """Get a specific provider instance initialized with user's API keys"""
+        if user_id != self.current_user_id:
+            await self.initialize(user_id)
+        elif not self.initialized:
+            await self.initialize(user_id)
+        
+        if provider_name not in self.providers:
+            raise ValueError(f"Provider '{provider_name}' not available for user {user_id}")
+        
+        return self.providers[provider_name]
     
     async def _check_provider_status(self, provider_name: str, provider_instance, force_refresh: bool = False) -> ProviderServiceStatus:
         """Check status of a provider"""
@@ -206,3 +260,9 @@ class ProviderService:
 
 # Global service instance
 provider_service = ProviderService()
+
+# Helper function for easy access
+async def get_user_provider_service(user_id: str) -> ProviderService:
+    """Get provider service initialized for a specific user"""
+    await provider_service.initialize(user_id)
+    return provider_service

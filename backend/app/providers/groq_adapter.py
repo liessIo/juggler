@@ -1,3 +1,5 @@
+# backend/app/providers/groq_adapter.py
+
 """
 Groq Provider Adapter for Juggler
 Handles Groq cloud AI models with fast inference
@@ -21,10 +23,10 @@ from .base import (
 class GroqAdapter(BaseProvider):
     """Provider adapter for Groq AI models"""
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str]):
         super().__init__("groq")
         self.api_key = api_key
-        self.client = None
+        self.client = None  # No type hint - simpler approach
         
     async def initialize(self) -> bool:
         """Initialize Groq connection"""
@@ -45,8 +47,10 @@ class GroqAdapter(BaseProvider):
             # Get available models
             self._models = await self.get_available_models()
             
-            # Test with simple request
-            if self._models and self.client:
+            # Test with simple request - check client is not None first
+            if self._models and self.client is not None:
+                # Assert for type checker - we know client is not None here
+                assert self.client is not None
                 response = self.client.chat.completions.create(
                     model=self._models[0].model_id,
                     messages=[{"role": "user", "content": "Hi"}],
@@ -67,7 +71,7 @@ class GroqAdapter(BaseProvider):
     
     async def get_available_models(self) -> List[ModelInfo]:
         """Get list of available Groq models"""
-        if not self.client:
+        if self.client is None:
             return []
             
         try:
@@ -164,7 +168,7 @@ class GroqAdapter(BaseProvider):
     
     async def health_check(self) -> ProviderStatus:
         """Check Groq service health"""
-        if not self.client:
+        if self.client is None:
             return ProviderStatus.DOWN
             
         try:
@@ -266,7 +270,7 @@ class GroqAdapter(BaseProvider):
         """Send message to Groq model"""
         start_time = time.time()
         
-        if not self.client:
+        if self.client is None:
             raise Exception("Groq client not initialized")
         
         try:
