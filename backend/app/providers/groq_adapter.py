@@ -41,7 +41,8 @@ class GroqAdapter(BaseProvider):
             return False
             
         try:
-            # Initialize Groq client
+            # Initialize Groq client with ONLY the api_key parameter
+            # Avoid any proxy or httpx configurations that might cause issues
             self.client = Groq(api_key=self.api_key)
             
             # Get available models
@@ -49,18 +50,33 @@ class GroqAdapter(BaseProvider):
             
             # Test with simple request - check client is not None first
             if self._models and self.client is not None:
-                # Assert for type checker - we know client is not None here
-                assert self.client is not None
-                response = self.client.chat.completions.create(
-                    model=self._models[0].model_id,
-                    messages=[{"role": "user", "content": "Hi"}],
-                    max_tokens=1,
-                    temperature=0
-                )
-                
-                self._status = ProviderStatus.HEALTHY
-                return True
+                try:
+                    # Assert for type checker - we know client is not None here
+                    assert self.client is not None
+                    
+                    # Find a safe model to test with (avoid TTS or special models)
+                    test_model = "llama-3.1-8b-instant"  # Default safe model
+                    for model in self._models:
+                        if "llama" in model.model_id.lower() or "mixtral" in model.model_id.lower():
+                            test_model = model.model_id
+                            break
+                    
+                    response = self.client.chat.completions.create(
+                        model=test_model,
+                        messages=[{"role": "user", "content": "Hi"}],
+                        max_tokens=1,
+                        temperature=0
+                    )
+                    
+                    self._status = ProviderStatus.HEALTHY
+                    print(f"Groq adapter initialized successfully with {len(self._models)} models")
+                    return True
+                except Exception as test_error:
+                    print(f"Groq test request failed: {test_error}")
+                    self._status = ProviderStatus.DOWN
+                    return False
             else:
+                print("No Groq models available or client not initialized")
                 self._status = ProviderStatus.DOWN
                 return False
                 
@@ -76,47 +92,52 @@ class GroqAdapter(BaseProvider):
             
         try:
             # Try to get models from API
-            models_response = self.client.models.list()
-            models = []
-            
-            if hasattr(models_response, 'data'):
-                for model in models_response.data:
-                    if hasattr(model, 'id'):
-                        # Determine model specs based on known models
-                        model_id = model.id
-                        context_window = 8192  # Default
-                        max_tokens = 8192
-                        
-                        if "70b" in model_id.lower():
-                            context_window = 8192
+            try:
+                models_response = self.client.models.list()
+                models = []
+                
+                if hasattr(models_response, 'data'):
+                    for model in models_response.data:
+                        if hasattr(model, 'id'):
+                            # Determine model specs based on known models
+                            model_id = model.id
+                            context_window = 8192  # Default
                             max_tokens = 8192
-                        elif "8b" in model_id.lower():
-                            context_window = 8192
-                            max_tokens = 8192
-                        elif "mixtral" in model_id.lower():
-                            context_window = 32768
-                            max_tokens = 32768
-                        elif "gemma" in model_id.lower():
-                            context_window = 8192
-                            max_tokens = 8192
-                        
-                        models.append(ModelInfo(
-                            model_id=model_id,
-                            display_name=self._format_model_name(model_id),
-                            context_window=context_window,
-                            max_output_tokens=max_tokens,
-                            supports_tools=False,  # Groq doesn't support function calling yet
-                            supports_vision=False
-                        ))
+                            
+                            if "70b" in model_id.lower():
+                                context_window = 8192
+                                max_tokens = 8192
+                            elif "8b" in model_id.lower():
+                                context_window = 8192
+                                max_tokens = 8192
+                            elif "mixtral" in model_id.lower():
+                                context_window = 32768
+                                max_tokens = 32768
+                            elif "gemma" in model_id.lower():
+                                context_window = 8192
+                                max_tokens = 8192
+                            
+                            models.append(ModelInfo(
+                                model_id=model_id,
+                                display_name=self._format_model_name(model_id),
+                                context_window=context_window,
+                                max_output_tokens=max_tokens,
+                                supports_tools=False,  # Groq doesn't support function calling yet
+                                supports_vision=False
+                            ))
+                
+                if models:
+                    print(f"Retrieved {len(models)} models from Groq API")
+                    return models
+            except Exception as api_error:
+                print(f"Failed to get models from Groq API: {api_error}")
             
             # Fallback to known models if API doesn't return models
-            if not models:
-                models = self._get_fallback_models()
-            
-            return models
+            print("Using fallback Groq models")
+            return self._get_fallback_models()
             
         except Exception as e:
-            print(f"Failed to get Groq models from API, using fallback: {e}")
+            print(f"Error in get_available_models: {e}")
             return self._get_fallback_models()
     
     def _get_fallback_models(self) -> List[ModelInfo]:
@@ -169,6 +190,7 @@ class GroqAdapter(BaseProvider):
     async def health_check(self) -> ProviderStatus:
         """Check Groq service health"""
         if self.client is None:
+            print("Groq health check: client is None")
             return ProviderStatus.DOWN
             
         try:
@@ -271,6 +293,7 @@ class GroqAdapter(BaseProvider):
         start_time = time.time()
         
         if self.client is None:
+            print(f"Groq send_message: client is None for model {model_id}")
             raise Exception("Groq client not initialized")
         
         try:
@@ -313,6 +336,8 @@ class GroqAdapter(BaseProvider):
         except Exception as e:
             end_time = time.time()
             latency_ms = int((end_time - start_time) * 1000)
+            
+            print(f"Groq send_message error: {e}")
             
             # Return error response
             error_message = CanonicalMessage(
