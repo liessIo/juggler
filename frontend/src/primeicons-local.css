@@ -1,0 +1,24 @@
+/* PrimeIcons - Local Font Files */
+@font-face {
+  font-family: 'primeicons';
+  font-display: block;
+  src: url('/fonts/primeicons.woff2') format('woff2'),
+       url('/fonts/primeicons.woff') format('woff'),
+       url('/fonts/primeicons.ttf') format('truetype');
+}
+
+.pi {
+  font-family: 'primeicons';
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  display: inline-block;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Import the actual icon definitions */
+@import 'primeicons/primeicons.css';

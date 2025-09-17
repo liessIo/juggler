@@ -1,43 +1,32 @@
 # backend/app/config.py
-
 """
-Application configuration
+Configuration management for Juggler v2
+Phase 1: Minimal configuration for Ollama
 """
+from pydantic_settings import BaseSettings
+from typing import Optional
 
-import os
-import secrets
-from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv()
-
-class Settings:
+class Settings(BaseSettings):
     """Application settings"""
-    # General
-    DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+    
+    # App settings
+    app_name: str = "Juggler v2"
+    debug: bool = False
+    
+    # Ollama settings
+    ollama_base_url: str = "http://localhost:11434"
+    
+    # Future: Other providers (not used in Phase 1)
+    groq_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    
+    # CORS settings
+    cors_origins: list = ["http://localhost:5173"]
+    
+    class Config:
+        env_file = "../.env"  # .env im Root-Verzeichnis
+        env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignoriere unbekannte Variablen (wie VITE_*)
 
-    # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
-    # API Keys
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    
-    # CORS
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    
-    # Database
-    DATABASE_PATH: Path = Path("data")
-    
-    # Rate Limiting
-    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))
-    RATE_LIMIT_PERIOD: int = int(os.getenv("RATE_LIMIT_PERIOD", "60"))
-    
-    # Model Cache
-    MODEL_CACHE_TTL: int = 300  # 5 minutes
-
+# Create global settings instance
 settings = Settings()
