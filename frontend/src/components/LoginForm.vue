@@ -163,6 +163,8 @@ async function handleLogin() {
   const result = await authStore.login(loginForm.username, loginForm.password)
   
   if (result.success) {
+    // Wait a tiny bit to ensure token is set in axios defaults
+    await new Promise(resolve => setTimeout(resolve, 100))
     router.push('/')
   } else {
     error.value = result.error
@@ -182,6 +184,8 @@ async function handleRegister() {
   )
   
   if (result.success) {
+    // Wait a tiny bit to ensure token is set in axios defaults
+    await new Promise(resolve => setTimeout(resolve, 100))
     router.push('/')
   } else {
     error.value = result.error

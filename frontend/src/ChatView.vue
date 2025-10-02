@@ -1,3 +1,4 @@
+<!-- frontend/src/ChatView.vue -->
 <template>
   <div class="min-h-screen bg-black flex text-gray-300 font-mono">
     <!-- Sidebar -->
@@ -39,26 +40,82 @@
         </button>
       </div>
       
-      <!-- Model Selection -->
+      <!-- Provider & Model Selection -->
       <div class="p-4 border-b border-cyan-900/30">
-        <div class="text-cyan-600 text-xs mb-2">MODEL SELECT</div>
+        <!-- Provider Select -->
+        <div class="text-cyan-600 text-xs mb-2">PROVIDER SELECT</div>
+        <select 
+          v-if="Object.keys(filteredProviders).length > 0"
+          v-model="selectedProvider"
+          @change="onProviderChange"
+          class="w-full px-2 py-1.5 bg-black border border-cyan-900/30 text-gray-300 text-xs focus:outline-none focus:border-cyan-500/50 mb-3"
+        >
+          <option v-for="(provider, key) in filteredProviders" :key="key" :value="key">
+            > {{ key.toUpperCase() }} ✓
+          </option>
+        </select>
+        
+        <!-- No Providers Message -->
+        <div v-else class="mb-3">
+          <div class="px-2 py-3 bg-zinc-900 border border-yellow-900/30 text-xs text-yellow-500">
+            No providers configured
+          </div>
+          <button 
+            @click="$router.push('/config?tab=models')"
+            class="mt-2 text-xs text-cyan-500 hover:text-cyan-400"
+          >
+            → Select models in configuration
+          </button>
+        </div>
+        
+        <!-- Model Select with Refresh -->
+        <div class="flex items-center gap-2 mb-2">
+          <div class="text-cyan-600 text-xs">MODEL SELECT</div>
+          <button 
+            @click="refreshProviders"
+            class="ml-auto text-cyan-500 hover:text-cyan-400 text-xs"
+            title="Configure models"
+          >
+            ⚙
+          </button>
+        </div>
+        
         <select 
           v-model="selectedModel"
+          @change="saveLastUsedModel"
+          :disabled="!availableModels.length"
           class="w-full px-2 py-1.5 bg-black border border-cyan-900/30 text-gray-300 text-xs focus:outline-none focus:border-cyan-500/50"
         >
+          <option v-if="!availableModels.length" value="">No models selected</option>
           <option v-for="model in availableModels" :key="model" :value="model">
             > {{ model }}
           </option>
         </select>
-        <div class="mt-2 flex items-center gap-2">
+        
+        <!-- Link to config if no models -->
+        <div v-if="selectedProvider && availableModels.length === 0" class="mt-2">
+          <button 
+            @click="$router.push('/config?tab=models')"
+            class="text-xs text-cyan-500 hover:text-cyan-400"
+          >
+            → Configure models in settings
+          </button>
+        </div>
+        
+        <!-- Provider Status -->
+        <div class="mt-3 flex items-center gap-2">
           <div class="flex gap-1">
-            <div class="w-1 h-3 bg-green-500"></div>
-            <div class="w-1 h-3 bg-green-500"></div>
-            <div class="w-1 h-3 bg-green-500"></div>
-            <div class="w-1 h-3 bg-gray-700"></div>
-            <div class="w-1 h-3 bg-gray-700"></div>
+            <div v-for="i in 5" :key="i" 
+                 :class="['w-1 h-3', i <= providerStatus ? 'bg-green-500' : 'bg-gray-700']"></div>
           </div>
-          <span class="text-xs text-green-500">ONLINE</span>
+          <span class="text-xs" :class="providerStatusColor">
+            {{ providerStatusText }}
+          </span>
+        </div>
+        
+        <!-- Model Count -->
+        <div class="mt-2 text-xs text-gray-600">
+          Models: {{ availableModels.length }}
         </div>
       </div>
 
@@ -74,8 +131,8 @@
         
         <div class="space-y-2">
           <div class="flex justify-between text-xs">
-            <span class="text-cyan-600">UPTIME</span>
-            <span class="text-gray-400">{{ sessionTime }}</span>
+            <span class="text-cyan-600">PROVIDER</span>
+            <span class="text-gray-400">{{ selectedProvider?.toUpperCase() || 'NONE' }}</span>
           </div>
           <div class="h-px bg-cyan-900/30"></div>
         </div>
@@ -109,7 +166,7 @@
       <div class="p-4 border-t border-cyan-900/30">
         <div class="flex items-center gap-2 text-xs text-gray-600">
           <i class="pi pi-server"></i>
-          <span>Powered by Ollama</span>
+          <span>Powered by {{ selectedProvider || 'AI' }}</span>
         </div>
       </div>
     </div>
@@ -123,6 +180,9 @@
           <span class="text-gray-400">{{ currentTitle || 'NEW SESSION' }}</span>
         </div>
         <div class="ml-auto flex items-center gap-4">
+          <div v-if="selectedModel" class="text-xs text-gray-500">
+            [{{ selectedProvider?.toUpperCase() }}::{{ selectedModel }}]
+          </div>
           <div v-if="isLoading" class="flex items-center gap-2">
             <div class="w-2 h-2 bg-yellow-500 animate-pulse"></div>
             <span class="text-xs text-yellow-500">PROCESSING</span>
@@ -136,10 +196,12 @@
           <!-- Boot Screen -->
           <div v-if="messages.length === 0" class="space-y-6">
             <div class="text-green-500/80 text-xs space-y-1">
-              <div>JUGGLER AI SYSTEM v2.0.0</div>
+              <div>JUGGLER AI SYSTEM v2.0.6</div>
               <div>================================</div>
               <div>Initializing neural interface...</div>
-              <div>Loading language model...</div>
+              <div>Loading language models...</div>
+              <div>{{ Object.keys(filteredProviders).length }} providers available</div>
+              <div>{{ totalModels }} models loaded</div>
               <div>System ready.</div>
               <div class="pt-4 text-cyan-500">
                 > Type command or query to begin_
@@ -169,7 +231,7 @@
                   USER>
                 </div>
                 <div v-else class="text-green-500 text-xs">
-                  AI>>>
+                  {{ message.provider || 'AI' }}>>>
                 </div>
               </div>
               
@@ -179,6 +241,7 @@
                   <pre class="text-sm text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">{{ message.content }}</pre>
                   <div class="mt-1 text-xs text-gray-600 flex items-center gap-3 font-mono">
                     <span>[{{ formatTime(message.id) }}]</span>
+                    <span v-if="message.model" class="text-gray-700">[{{ message.model }}]</span>
                     <button 
                       v-if="message.role === 'assistant'" 
                       @click="copyToClipboard(message.content)"
@@ -194,7 +257,7 @@
 
           <!-- Loading State -->
           <div v-if="isLoading" class="flex items-start gap-3">
-            <div class="text-yellow-500 text-xs mt-1">AI>>></div>
+            <div class="text-yellow-500 text-xs mt-1">{{ selectedProvider?.toUpperCase() }}>>></div>
             <div class="flex-1">
               <div class="border-l border-cyan-900/30 pl-3">
                 <span class="text-yellow-500 text-sm">
@@ -212,13 +275,12 @@
           <form @submit.prevent="sendMessage" class="flex items-center gap-2">
             <span class="text-cyan-500 text-sm">></span>
             <input
+              ref="inputField"
               v-model="inputMessage"
               type="text"
               placeholder="_"
               class="flex-1 bg-transparent text-gray-300 text-sm placeholder-gray-700 focus:outline-none font-mono"
               :disabled="isLoading || !selectedModel"
-              @keyup="showCursor = false"
-              @blur="showCursor = true"
             />
             <button
               type="submit"
@@ -233,16 +295,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Side Indicators -->
-    <div class="w-8 bg-zinc-950 border-l border-cyan-900/30 flex flex-col items-center py-4 gap-2">
-      <div class="w-1 h-8 bg-cyan-500/50"></div>
-      <div class="w-1 h-4 bg-green-500"></div>
-      <div class="w-1 h-4 bg-green-500"></div>
-      <div class="w-1 h-4 bg-green-500/50"></div>
-      <div class="flex-1"></div>
-      <div class="w-1 h-1 bg-cyan-500 animate-pulse"></div>
     </div>
   </div>
 </template>
@@ -262,20 +314,30 @@ interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  provider?: string
+  model?: string
+}
+
+interface Provider {
+  available: boolean
+  models: string[]
 }
 
 // State
 const messages = ref<Message[]>([])
 const inputMessage = ref('')
+const inputField = ref<HTMLInputElement>()
 const isLoading = ref(false)
+const isRefreshing = ref(false)
 const conversationId = ref<string | null>(null)
+const providers = ref<Record<string, Provider>>({})
+const selectedProvider = ref<string>('')
 const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const messagesContainer = ref<HTMLElement>()
 const currentTitle = ref('')
 const conversationHistory = ref<{id: string, title: string}[]>([])
 const startTime = ref(Date.now())
-const showCursor = ref(true)
 
 // Quick Actions
 const quickActions = [
@@ -285,38 +347,140 @@ const quickActions = [
 ]
 
 // Computed
-const sessionTime = computed(() => {
-  const elapsed = Math.floor((Date.now() - startTime.value) / 1000)
-  const hours = Math.floor(elapsed / 3600)
-  const minutes = Math.floor((elapsed % 3600) / 60)
-  const seconds = elapsed % 60
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+const filteredProviders = computed(() => {
+  const filtered: Record<string, Provider> = {}
+  for (const [key, provider] of Object.entries(providers.value)) {
+    if (provider.available && provider.models.length > 0) {
+      filtered[key] = provider
+    }
+  }
+  return filtered
+})
+
+const providerStatus = computed(() => {
+  if (!selectedProvider.value) return 0
+  const provider = providers.value[selectedProvider.value]
+  if (!provider) return 0
+  if (!provider.available) return 1
+  if (provider.models.length === 0) return 2
+  if (provider.models.length < 3) return 3
+  if (provider.models.length < 10) return 4
+  return 5
+})
+
+const providerStatusText = computed(() => {
+  if (!selectedProvider.value) return 'NO PROVIDER'
+  const provider = providers.value[selectedProvider.value]
+  if (!provider) return 'UNKNOWN'
+  if (!provider.available) return 'OFFLINE'
+  if (provider.models.length === 0) return 'NO MODELS'
+  return 'ONLINE'
+})
+
+const providerStatusColor = computed(() => {
+  if (providerStatus.value === 0) return 'text-gray-700'
+  if (providerStatus.value === 1) return 'text-red-500'
+  if (providerStatus.value < 3) return 'text-yellow-500'
+  return 'text-green-500'
+})
+
+const totalModels = computed(() => {
+  return Object.values(filteredProviders.value).reduce((sum, p) => sum + p.models.length, 0)
 })
 
 // API
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
-onMounted(async () => {
+// LocalStorage keys for last-used models
+const LAST_USED_MODEL_KEY = 'juggler_last_used_models'
+
+// Functions
+const loadLastUsedModel = () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/providers`)
-    const ollama = response.data.providers.ollama
-    if (ollama && ollama.available) {
-      availableModels.value = ollama.models
-      if (ollama.models.length > 0) {
-        selectedModel.value = ollama.models[0]
+    const saved = localStorage.getItem(LAST_USED_MODEL_KEY)
+    if (saved) {
+      const lastUsed = JSON.parse(saved)
+      const provider = selectedProvider.value
+      if (provider && lastUsed[provider] && availableModels.value.includes(lastUsed[provider])) {
+        selectedModel.value = lastUsed[provider]
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load last used model:', e)
+  }
+}
+
+const saveLastUsedModel = () => {
+  try {
+    const saved = localStorage.getItem(LAST_USED_MODEL_KEY)
+    const lastUsed = saved ? JSON.parse(saved) : {}
+    lastUsed[selectedProvider.value] = selectedModel.value
+    localStorage.setItem(LAST_USED_MODEL_KEY, JSON.stringify(lastUsed))
+  } catch (e) {
+    console.error('Failed to save last used model:', e)
+  }
+}
+
+const fetchEnabledModels = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/config/models/enabled`, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    })
+    providers.value = response.data.providers
+    
+    // Auto-select first available provider if none selected
+    if (!selectedProvider.value) {
+      const availableProvider = Object.keys(filteredProviders.value).find(
+        key => filteredProviders.value[key].available && filteredProviders.value[key].models.length > 0
+      )
+      if (availableProvider) {
+        selectedProvider.value = availableProvider
+        onProviderChange()
       }
     }
   } catch (error) {
-    console.error('Failed to fetch providers:', error)
+    console.error('Failed to fetch enabled models:', error)
   }
-  
-  setInterval(() => {
-    startTime.value = startTime.value
-  }, 1000)
+}
+
+const refreshProviders = async () => {
+  // Redirect to config for model management
+  router.push('/config?tab=models')
+}
+
+const onProviderChange = () => {
+  const provider = providers.value[selectedProvider.value]
+  if (provider && provider.available) {
+    availableModels.value = provider.models
+    if (provider.models.length > 0) {
+      // Try to load last-used model first
+      loadLastUsedModel()
+      
+      // If no last-used or not available, pick a good default
+      if (!selectedModel.value || !availableModels.value.includes(selectedModel.value)) {
+        const preferredModels = ['claude-3.5-sonnet', 'llama-3.3-70b', 'phi3:medium']
+        const defaultModel = provider.models.find(m => 
+          preferredModels.some(pref => m.includes(pref))
+        ) || provider.models[0]
+        selectedModel.value = defaultModel
+      }
+    } else {
+      selectedModel.value = ''
+    }
+  } else {
+    availableModels.value = []
+    selectedModel.value = ''
+  }
+}
+
+// Lifecycle
+onMounted(async () => {
+  await fetchEnabledModels()
 })
 
+// Message handling
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || !selectedModel.value) return
+  if (!inputMessage.value.trim() || !selectedModel.value || !selectedProvider.value) return
 
   const userMessage: Message = {
     id: Date.now().toString(),
@@ -340,9 +504,13 @@ const sendMessage = async () => {
   try {
     const response = await axios.post(`${API_BASE_URL}/api/chat/send`, {
       message: messageText,
-      provider: 'ollama',
+      provider: selectedProvider.value,
       model: selectedModel.value,
       conversation_id: conversationId.value
+    }, {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`
+      }
     })
 
     if (!conversationId.value) {
@@ -352,31 +520,36 @@ const sendMessage = async () => {
     messages.value.push({
       id: response.data.message_id,
       role: 'assistant',
-      content: response.data.response
+      content: response.data.response,
+      provider: selectedProvider.value,
+      model: selectedModel.value
     })
 
     await nextTick()
     scrollToBottom()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed:', error)
+    const errorMsg = error.response?.data?.detail || 'Connection failed. Check system status.'
     messages.value.push({
       id: Date.now().toString(),
       role: 'assistant',
-      content: '[ERROR] Connection failed. Check system status.'
+      content: `[ERROR] ${errorMsg}`,
+      provider: selectedProvider.value
     })
   } finally {
     isLoading.value = false
+    // UX FIX: Auto-focus input field after sending
+    await nextTick()
+    inputField.value?.focus()
   }
 }
 
 const startNewChat = () => {
-  // Save current chat to history if it has messages
   if (messages.value.length > 0 && currentTitle.value) {
     conversationHistory.value.unshift({
       id: conversationId.value || Date.now().toString(),
       title: currentTitle.value
     })
-    // Keep only last 10 conversations
     if (conversationHistory.value.length > 10) {
       conversationHistory.value.pop()
     }
@@ -410,13 +583,11 @@ const formatTime = (id: string) => {
 </script>
 
 <style scoped>
-/* UI stays mono, but messages get better font */
 * {
   font-family: 'Courier New', monospace;
 }
 
-/* Better readability for actual chat content */
-pre.message-content {
+pre {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
@@ -431,7 +602,6 @@ pre.message-content {
   opacity: 0.5;
 }
 
-/* Terminal cursor effect */
 input::placeholder {
   animation: blink 1s infinite;
 }

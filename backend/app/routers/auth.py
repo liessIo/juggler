@@ -8,7 +8,7 @@ from app.models.schemas import UserCreate, UserLogin, UserResponse, Token
 from app.services.auth_service import auth_service
 from app.models.user import User
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Dependency to get current user

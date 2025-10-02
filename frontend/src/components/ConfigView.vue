@@ -1,299 +1,512 @@
+<!-- frontend/src/ConfigView.vue -->
 <template>
   <div class="min-h-screen bg-black text-gray-300 font-mono">
-    <div class="max-w-4xl mx-auto p-8">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-2xl font-bold text-cyan-500 mb-2">SYSTEM CONFIGURATION</h1>
-        <div class="h-px bg-cyan-900/30"></div>
-      </div>
-
-      <!-- API Keys Section -->
-      <div class="space-y-6">
-        <!-- Groq API Key -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs flex items-center gap-2">
-              <span v-if="keyStatus.groq_api_key.exists" class="text-green-500">●</span>
-              <span v-else class="text-red-500">●</span>
-              <span :class="keyStatus.groq_api_key.exists ? 'text-green-600' : 'text-cyan-600'">
-                GROQ API KEY
-              </span>
-              <span v-if="keyStatus.groq_api_key.exists" class="text-green-500 text-xs">
-                [STORED]
-              </span>
-            </label>
-            <button 
-              v-if="keyStatus.groq_api_key.exists"
-              @click="deleteKey('groq_api_key')"
-              class="px-2 py-1 text-xs text-red-400 border border-red-900/30 hover:border-red-500/50 transition-all"
-            >
-              [DELETE]
-            </button>
-          </div>
-          <div class="relative">
-            <input
-              v-model="config.groq_api_key"
-              type="password"
-              :class="[
-                'w-full px-3 py-2 bg-zinc-900 text-gray-300 focus:outline-none transition-all',
-                keyStatus.groq_api_key.exists ? 'border border-green-900/30 focus:border-green-500/50' : 'border border-cyan-900/30 focus:border-cyan-500/50',
-                hasChanges.groq_api_key && 'border-yellow-500/50'
-              ]"
-              :placeholder="keyStatus.groq_api_key.exists 
-                ? 'API key stored. Enter new key to overwrite' 
-                : 'No API key stored, please enter Groq key'"
-              @input="markChanged('groq_api_key')"
-            />
-            <div v-if="keyStatus.groq_api_key.exists && keyStatus.groq_api_key.masked" 
-                 class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-600">
-              {{ keyStatus.groq_api_key.masked }}
+    <!-- Header -->
+    <div class="border-b border-cyan-900/30 bg-zinc-950">
+      <div class="max-w-6xl mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <div class="w-8 h-8 border border-cyan-500/50 flex items-center justify-center">
+                <div class="w-1 h-4 bg-cyan-500"></div>
+                <div class="w-4 h-1 bg-cyan-500 absolute"></div>
+              </div>
+            </div>
+            <div>
+              <h1 class="text-gray-100 font-bold text-sm tracking-wider">JUGGLER CONFIGURATION</h1>
+              <p class="text-cyan-600 text-xs">SYSTEM SETTINGS</p>
             </div>
           </div>
-        </div>
-
-        <!-- Anthropic API Key -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs flex items-center gap-2">
-              <span v-if="keyStatus.anthropic_api_key.exists" class="text-green-500">●</span>
-              <span v-else class="text-red-500">●</span>
-              <span :class="keyStatus.anthropic_api_key.exists ? 'text-green-600' : 'text-cyan-600'">
-                ANTHROPIC API KEY
-              </span>
-              <span v-if="keyStatus.anthropic_api_key.exists" class="text-green-500 text-xs">
-                [STORED]
-              </span>
-            </label>
-            <button 
-              v-if="keyStatus.anthropic_api_key.exists"
-              @click="deleteKey('anthropic_api_key')"
-              class="px-2 py-1 text-xs text-red-400 border border-red-900/30 hover:border-red-500/50 transition-all"
-            >
-              [DELETE]
-            </button>
-          </div>
-          <div class="relative">
-            <input
-              v-model="config.anthropic_api_key"
-              type="password"
-              :class="[
-                'w-full px-3 py-2 bg-zinc-900 text-gray-300 focus:outline-none transition-all',
-                keyStatus.anthropic_api_key.exists ? 'border border-green-900/30 focus:border-green-500/50' : 'border border-cyan-900/30 focus:border-cyan-500/50',
-                hasChanges.anthropic_api_key && 'border-yellow-500/50'
-              ]"
-              :placeholder="keyStatus.anthropic_api_key.exists 
-                ? 'API key stored. Enter new key to overwrite' 
-                : 'No API key stored, please enter Anthropic key'"
-              @input="markChanged('anthropic_api_key')"
-            />
-            <div v-if="keyStatus.anthropic_api_key.exists && keyStatus.anthropic_api_key.masked" 
-                 class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-600">
-              {{ keyStatus.anthropic_api_key.masked }}
-            </div>
-          </div>
-        </div>
-
-        <!-- OpenAI API Key -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs flex items-center gap-2">
-              <span v-if="keyStatus.openai_api_key.exists" class="text-green-500">●</span>
-              <span v-else class="text-red-500">●</span>
-              <span :class="keyStatus.openai_api_key.exists ? 'text-green-600' : 'text-cyan-600'">
-                OPENAI API KEY
-              </span>
-              <span v-if="keyStatus.openai_api_key.exists" class="text-green-500 text-xs">
-                [STORED]
-              </span>
-            </label>
-            <button 
-              v-if="keyStatus.openai_api_key.exists"
-              @click="deleteKey('openai_api_key')"
-              class="px-2 py-1 text-xs text-red-400 border border-red-900/30 hover:border-red-500/50 transition-all"
-            >
-              [DELETE]
-            </button>
-          </div>
-          <div class="relative">
-            <input
-              v-model="config.openai_api_key"
-              type="password"
-              :class="[
-                'w-full px-3 py-2 bg-zinc-900 text-gray-300 focus:outline-none transition-all',
-                keyStatus.openai_api_key.exists ? 'border border-green-900/30 focus:border-green-500/50' : 'border border-cyan-900/30 focus:border-cyan-500/50',
-                hasChanges.openai_api_key && 'border-yellow-500/50'
-              ]"
-              :placeholder="keyStatus.openai_api_key.exists 
-                ? 'API key stored. Enter new key to overwrite' 
-                : 'No API key stored, please enter OpenAI key'"
-              @input="markChanged('openai_api_key')"
-            />
-            <div v-if="keyStatus.openai_api_key.exists && keyStatus.openai_api_key.masked" 
-                 class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-600">
-              {{ keyStatus.openai_api_key.masked }}
-            </div>
-          </div>
+          <button 
+            @click="$router.push('/')"
+            class="px-4 py-2 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs tracking-wider transition-all"
+          >
+            [← BACK TO CHAT]
+          </button>
         </div>
       </div>
+    </div>
 
-      <!-- Status Summary -->
-      <div class="mt-6 p-4 bg-zinc-900 border border-cyan-900/30">
-        <div class="text-xs space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="text-cyan-600">SYSTEM STATUS:</span>
-            <span class="text-green-500">ONLINE</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-cyan-600">CONFIGURED PROVIDERS:</span>
-            <span class="text-gray-400">
-              {{ Object.values(keyStatus).filter(k => k.exists).length }} / 3
+    <div class="max-w-6xl mx-auto px-6 py-8">
+      <!-- Tabs -->
+      <div class="flex gap-1 mb-8 border-b border-cyan-900/30">
+        <button 
+          @click="activeTab = 'api-keys'"
+          :class="[
+            'px-4 py-2 text-xs tracking-wider transition-all',
+            activeTab === 'api-keys' 
+              ? 'bg-zinc-900 border-t border-l border-r border-cyan-500/50 text-cyan-400' 
+              : 'border-b border-cyan-900/30 text-gray-500 hover:text-gray-300'
+          ]"
+        >
+          API KEYS
+        </button>
+        <button 
+          @click="activeTab = 'models'"
+          :class="[
+            'px-4 py-2 text-xs tracking-wider transition-all',
+            activeTab === 'models' 
+              ? 'bg-zinc-900 border-t border-l border-r border-cyan-500/50 text-cyan-400' 
+              : 'border-b border-cyan-900/30 text-gray-500 hover:text-gray-300'
+          ]"
+        >
+          MODEL SELECTION
+        </button>
+        <button 
+          @click="activeTab = 'status'"
+          :class="[
+            'px-4 py-2 text-xs tracking-wider transition-all',
+            activeTab === 'status' 
+              ? 'bg-zinc-900 border-t border-l border-r border-cyan-500/50 text-cyan-400' 
+              : 'border-b border-cyan-900/30 text-gray-500 hover:text-gray-300'
+          ]"
+        >
+          STATUS
+        </button>
+      </div>
+
+      <!-- API Keys Tab -->
+      <div v-if="activeTab === 'api-keys'" class="space-y-6">
+        <div class="text-cyan-600 text-sm mb-4">API KEY CONFIGURATION</div>
+        
+        <!-- API Key Cards -->
+        <div v-for="provider in providers" :key="provider.key" class="bg-zinc-950 border border-cyan-900/30 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div :class="['w-2 h-2', getStatusColor(provider.key)]"></div>
+              <span class="text-sm text-gray-100">{{ provider.name }}</span>
+            </div>
+            <span class="text-xs" :class="getStatusTextColor(provider.key)">
+              {{ getStatusText(provider.key) }}
             </span>
           </div>
-          <div v-if="Object.values(hasChanges).some(v => v)" class="flex items-center gap-2">
-            <span class="text-yellow-500">⚠</span>
-            <span class="text-yellow-500">UNSAVED CHANGES</span>
+          
+          <div class="flex gap-2">
+            <input
+              v-if="editingKey === provider.key"
+              v-model="tempKeys[provider.key]"
+              type="password"
+              :placeholder="`Enter ${provider.name} API Key`"
+              class="flex-1 px-3 py-1.5 bg-black border border-cyan-900/30 text-gray-300 text-xs focus:outline-none focus:border-cyan-500/50"
+              @keyup.enter="saveKey(provider.key)"
+              @keyup.escape="cancelEdit(provider.key)"
+            />
+            <input
+              v-else
+              :value="getMaskedKey(provider.key)"
+              readonly
+              class="flex-1 px-3 py-1.5 bg-black/50 border border-cyan-900/20 text-gray-500 text-xs"
+              :placeholder="config[provider.key]?.exists ? '' : 'No API key configured'"
+            />
+            
+            <button
+              v-if="editingKey === provider.key"
+              @click="saveKey(provider.key)"
+              class="px-3 py-1.5 border border-green-900/30 hover:border-green-500/50 text-green-400 text-xs"
+            >
+              SAVE
+            </button>
+            <button
+              v-if="editingKey === provider.key"
+              @click="cancelEdit(provider.key)"
+              class="px-3 py-1.5 border border-gray-900/30 hover:border-gray-500/50 text-gray-400 text-xs"
+            >
+              CANCEL
+            </button>
+            <button
+              v-if="editingKey !== provider.key"
+              @click="startEdit(provider.key)"
+              class="px-3 py-1.5 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs"
+            >
+              {{ config[provider.key]?.exists ? 'EDIT' : 'ADD' }}
+            </button>
+            <button
+              v-if="config[provider.key]?.exists && editingKey !== provider.key"
+              @click="deleteKey(provider.key)"
+              class="px-3 py-1.5 border border-red-900/30 hover:border-red-500/50 text-red-400 text-xs"
+            >
+              DELETE
+            </button>
+          </div>
+        </div>
+        
+        <!-- Status Messages -->
+        <div v-if="statusMessage" :class="['text-xs mt-4', statusMessage.type === 'error' ? 'text-red-400' : 'text-green-400']">
+          {{ statusMessage.text }}
+        </div>
+      </div>
+
+      <!-- Model Selection Tab -->
+      <div v-if="activeTab === 'models'" class="space-y-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-cyan-600 text-sm">MODEL SELECTION</div>
+          <div class="text-xs text-gray-500">
+            Select which models to show in the chat interface
+          </div>
+        </div>
+
+        <!-- Provider Selector -->
+        <div class="flex gap-2 mb-6">
+          <button
+            v-for="provider in availableProviders"
+            :key="provider"
+            @click="selectedProvider = provider"
+            :class="[
+              'px-4 py-2 text-xs border transition-all',
+              selectedProvider === provider
+                ? 'border-cyan-500/50 bg-zinc-900 text-cyan-400'
+                : 'border-cyan-900/30 text-gray-500 hover:text-gray-300'
+            ]"
+          >
+            {{ provider.toUpperCase() }}
+            <span v-if="modelCounts[provider]" class="ml-2 text-gray-600">
+              ({{ modelCounts[provider].enabled }}/{{ modelCounts[provider].total }})
+            </span>
+          </button>
+        </div>
+
+        <!-- Model List -->
+        <div v-if="selectedProvider" class="space-y-4">
+          <!-- Actions Bar -->
+          <div class="flex items-center justify-between bg-zinc-950 border border-cyan-900/30 p-3">
+            <div class="flex gap-2">
+              <button
+                @click="selectAll"
+                class="px-3 py-1 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs"
+              >
+                SELECT ALL
+              </button>
+              <button
+                @click="selectNone"
+                class="px-3 py-1 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs"
+              >
+                CLEAR ALL
+              </button>
+            </div>
+            <button
+              @click="refreshModels"
+              :disabled="isRefreshing"
+              class="px-3 py-1 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs disabled:opacity-50"
+            >
+              {{ isRefreshing ? 'REFRESHING...' : 'REFRESH MODELS' }}
+            </button>
+          </div>
+
+          <!-- Models Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="(modelInfo, modelId) in providerModels[selectedProvider]"
+              :key="modelId"
+              class="bg-zinc-950 border border-cyan-900/30 p-3 hover:border-cyan-500/30 transition-all"
+            >
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="modelInfo.enabled"
+                  class="mt-1 w-4 h-4 bg-black border border-cyan-500/50 text-cyan-500 focus:ring-0"
+                />
+                <div class="flex-1">
+                  <div class="text-sm text-gray-200">{{ modelInfo.name || modelId }}</div>
+                  <div class="text-xs text-gray-500 mt-1">{{ modelInfo.description || 'No description available' }}</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- No Models Message -->
+          <div v-if="!providerModels[selectedProvider] || Object.keys(providerModels[selectedProvider]).length === 0" 
+               class="bg-zinc-950 border border-cyan-900/30 p-8 text-center">
+            <div class="text-gray-500 mb-3">No models available for {{ selectedProvider }}</div>
+            <button
+              @click="refreshModels"
+              class="px-4 py-2 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-xs"
+            >
+              FETCH MODELS
+            </button>
+          </div>
+
+          <!-- Save Button -->
+          <div class="flex justify-end mt-6">
+            <button
+              @click="saveModelSelection"
+              :disabled="isSaving"
+              class="px-6 py-2 bg-zinc-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-400 text-xs tracking-wider disabled:opacity-50"
+            >
+              {{ isSaving ? 'SAVING...' : 'SAVE SELECTION' }}
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Actions -->
-      <div class="mt-8 flex gap-4">
-        <button
-          @click="saveConfig"
-          :disabled="!Object.values(hasChanges).some(v => v)"
-          class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-800 disabled:text-gray-600 text-black font-bold text-sm transition-all"
-        >
-          [SAVE CONFIG]
-        </button>
-        <button
-          @click="$router.push('/')"
-          class="px-4 py-2 border border-cyan-900/30 hover:border-cyan-500/50 text-cyan-400 text-sm transition-all"
-        >
-          [BACK TO CHAT]
-        </button>
-      </div>
-
-      <!-- Status Message -->
-      <div v-if="statusMessage" class="mt-4 text-sm" :class="statusMessage.type === 'success' ? 'text-green-500' : 'text-red-500'">
-        {{ statusMessage.text }}
+      <!-- Status Tab -->
+      <div v-if="activeTab === 'status'" class="space-y-6">
+        <div class="text-cyan-600 text-sm mb-4">SYSTEM STATUS</div>
+        
+        <!-- Provider Status Cards -->
+        <div class="grid grid-cols-3 gap-4">
+          <div v-for="(status, provider) in providerStatus" :key="provider" 
+               class="bg-zinc-950 border border-cyan-900/30 p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm text-gray-100">{{ provider.toUpperCase() }}</span>
+              <div :class="['w-2 h-2', status.available ? 'bg-green-500' : 'bg-red-500']"></div>
+            </div>
+            <div class="space-y-1">
+              <div class="text-xs text-gray-500">
+                Status: <span :class="status.available ? 'text-green-400' : 'text-red-400'">
+                  {{ status.available ? 'ONLINE' : 'OFFLINE' }}
+                </span>
+              </div>
+              <div class="text-xs text-gray-500">
+                Models: <span class="text-gray-400">{{ status.modelCount || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
-import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
-const router = useRouter()
-
-// Configuration values
-const config = ref({
-  groq_api_key: '',
-  anthropic_api_key: '',
-  openai_api_key: ''
-})
-
-// Key status from backend
-const keyStatus = ref({
-  groq_api_key: { exists: false, masked: '' },
-  anthropic_api_key: { exists: false, masked: '' },
-  openai_api_key: { exists: false, masked: '' }
-})
-
-// Track changes
-const hasChanges = ref({
-  groq_api_key: false,
-  anthropic_api_key: false,
-  openai_api_key: false
-})
-
-const statusMessage = ref<{type: string, text: string} | null>(null)
+const authStore = useAuthStore()
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
-// Load current configuration status
-onMounted(async () => {
-  await loadConfigStatus()
+// Tab Management - WICHTIG: activeTab startet mit 'api-keys'
+const activeTab = ref('api-keys')
+
+// API Keys Management
+const providers = [
+  { key: 'groq_api_key', name: 'Groq' },
+  { key: 'anthropic_api_key', name: 'Anthropic' },
+  { key: 'openai_api_key', name: 'OpenAI' }
+]
+
+const config = ref<Record<string, any>>({})
+const editingKey = ref<string | null>(null)
+const tempKeys = ref<Record<string, string>>({})
+const statusMessage = ref<{ type: string; text: string } | null>(null)
+
+// Model Selection
+const selectedProvider = ref('ollama')
+const availableProviders = ref<string[]>(['ollama', 'groq', 'anthropic'])
+const providerModels = ref<Record<string, Record<string, any>>>({})
+const isRefreshing = ref(false)
+const isSaving = ref(false)
+
+// Provider Status
+const providerStatus = ref<Record<string, any>>({})
+
+// Computed
+const modelCounts = computed(() => {
+  const counts: Record<string, { enabled: number; total: number }> = {}
+  
+  for (const provider of availableProviders.value) {
+    const models = providerModels.value[provider] || {}
+    const total = Object.keys(models).length
+    const enabled = Object.values(models).filter((m: any) => m.enabled).length
+    counts[provider] = { enabled, total }
+  }
+  
+  return counts
 })
 
-const loadConfigStatus = async () => {
+// API Key Functions
+const loadConfig = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/config/`)
-    keyStatus.value = response.data
-    
-    // Reset input fields
-    config.value = {
-      groq_api_key: '',
-      anthropic_api_key: '',
-      openai_api_key: ''
-    }
-    
-    // Reset change tracking
-    hasChanges.value = {
-      groq_api_key: false,
-      anthropic_api_key: false,
-      openai_api_key: false
-    }
+    const response = await axios.get(`${API_BASE_URL}/api/config/`, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    })
+    config.value = response.data
   } catch (error) {
     console.error('Failed to load config:', error)
-    statusMessage.value = { type: 'error', text: 'Failed to load configuration status' }
   }
 }
 
-const markChanged = (key: 'groq_api_key' | 'anthropic_api_key' | 'openai_api_key') => {
-  hasChanges.value[key] = true
+const getMaskedKey = (key: string) => {
+  return config.value[key]?.masked || ''
 }
 
-const saveConfig = async () => {
-  try {
-    // Only send changed values
-    const changedConfig: any = {}
-    
-    Object.keys(config.value).forEach((key) => {
-      const k = key as keyof typeof config.value
-      if (hasChanges.value[k] && config.value[k]) {
-        changedConfig[k] = config.value[k]
-      }
-    })
-    
-    if (Object.keys(changedConfig).length === 0) {
-      statusMessage.value = { type: 'error', text: 'No changes to save' }
-      return
-    }
-    
-    const response = await axios.post(`${API_BASE_URL}/api/config/`, changedConfig)
-    statusMessage.value = { type: 'success', text: response.data.message }
-    
-    // Reload status after save
-    setTimeout(async () => {
-      await loadConfigStatus()
-      statusMessage.value = null
-    }, 2000)
-  } catch (error) {
-    statusMessage.value = { type: 'error', text: 'Failed to save configuration' }
-  }
+const getStatusColor = (key: string) => {
+  return config.value[key]?.exists ? 'bg-green-500' : 'bg-gray-700'
 }
 
-const deleteKey = async (key: 'groq_api_key' | 'anthropic_api_key' | 'openai_api_key') => {
-  if (!confirm(`Are you sure you want to delete the ${key.replace(/_/g, ' ').toUpperCase()}?`)) {
+const getStatusText = (key: string) => {
+  return config.value[key]?.exists ? 'CONFIGURED' : 'NOT CONFIGURED'
+}
+
+const getStatusTextColor = (key: string) => {
+  return config.value[key]?.exists ? 'text-green-500' : 'text-gray-500'
+}
+
+const startEdit = (key: string) => {
+  editingKey.value = key
+  tempKeys.value[key] = ''
+}
+
+const cancelEdit = (key: string) => {
+  editingKey.value = null
+  tempKeys.value[key] = ''
+}
+
+const saveKey = async (key: string) => {
+  if (!tempKeys.value[key]) {
+    cancelEdit(key)
     return
   }
   
   try {
-    // Send DELETE value to backend
-    const deleteConfig = { [key]: 'DELETE' }
-    await axios.post(`${API_BASE_URL}/api/config/`, deleteConfig)
+    const update: any = {}
+    update[key] = tempKeys.value[key]
     
-    statusMessage.value = { type: 'success', text: `${key.replace(/_/g, ' ').toUpperCase()} deleted` }
+    await axios.post(`${API_BASE_URL}/api/config/`, update, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    })
     
-    // Reload status
-    setTimeout(async () => {
-      await loadConfigStatus()
+    statusMessage.value = { type: 'success', text: 'API key saved successfully' }
+    await loadConfig()
+    cancelEdit(key)
+    
+    setTimeout(() => {
       statusMessage.value = null
-    }, 2000)
+    }, 3000)
   } catch (error) {
-    statusMessage.value = { type: 'error', text: 'Failed to delete key' }
+    statusMessage.value = { type: 'error', text: 'Failed to save API key' }
   }
 }
+
+const deleteKey = async (key: string) => {
+  if (!confirm(`Delete ${key.replace('_api_key', '').toUpperCase()} API key?`)) return
+  
+  try {
+    await axios.delete(`${API_BASE_URL}/api/config/${key}`, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    })
+    
+    statusMessage.value = { type: 'success', text: 'API key deleted' }
+    await loadConfig()
+    
+    setTimeout(() => {
+      statusMessage.value = null
+    }, 3000)
+  } catch (error) {
+    statusMessage.value = { type: 'error', text: 'Failed to delete API key' }
+  }
+}
+
+// Model Selection Functions
+const loadProviderModels = async (provider: string) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/config/models/${provider}`, {
+      headers: { 'Authorization': `Bearer ${authStore.token}` }
+    })
+    
+    providerModels.value[provider] = response.data.models || {}
+  } catch (error) {
+    console.error(`Failed to load models for ${provider}:`, error)
+    providerModels.value[provider] = {}
+  }
+}
+
+const refreshModels = async () => {
+  if (!selectedProvider.value) return
+  
+  isRefreshing.value = true
+  try {
+    await axios.post(
+      `${API_BASE_URL}/api/config/models/${selectedProvider.value}/refresh`,
+      {},
+      { headers: { 'Authorization': `Bearer ${authStore.token}` } }
+    )
+    
+    await loadProviderModels(selectedProvider.value)
+  } catch (error) {
+    console.error('Failed to refresh models:', error)
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+const selectAll = () => {
+  const models = providerModels.value[selectedProvider.value] || {}
+  for (const modelId in models) {
+    models[modelId].enabled = true
+  }
+}
+
+const selectNone = () => {
+  const models = providerModels.value[selectedProvider.value] || {}
+  for (const modelId in models) {
+    models[modelId].enabled = false
+  }
+}
+
+const saveModelSelection = async () => {
+  if (!selectedProvider.value) return
+  
+  isSaving.value = true
+  try {
+    const models = providerModels.value[selectedProvider.value] || {}
+    const enabledModels = Object.keys(models).filter(id => models[id].enabled)
+    
+    await axios.post(
+      `${API_BASE_URL}/api/config/models/${selectedProvider.value}/selection`,
+      {
+        provider: selectedProvider.value,
+        enabled_models: enabledModels
+      },
+      { headers: { 'Authorization': `Bearer ${authStore.token}` } }
+    )
+    
+    statusMessage.value = { type: 'success', text: 'Model selection saved' }
+    setTimeout(() => {
+      statusMessage.value = null
+    }, 3000)
+  } catch (error) {
+    console.error('Failed to save model selection:', error)
+    statusMessage.value = { type: 'error', text: 'Failed to save model selection' }
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const loadProviderStatus = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/providers`)
+    const providers = response.data.providers || {}
+    
+    for (const [name, info] of Object.entries(providers)) {
+      providerStatus.value[name] = {
+        available: (info as any).available,
+        modelCount: (info as any).models?.length || 0
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load provider status:', error)
+  }
+}
+
+// Lifecycle
+onMounted(async () => {
+  await loadConfig()
+  await loadProviderStatus()
+  
+  // Load models for all providers
+  for (const provider of availableProviders.value) {
+    await loadProviderModels(provider)
+  }
+})
 </script>
+
+<style scoped>
+* {
+  font-family: 'Courier New', monospace;
+}
+
+input[type="checkbox"] {
+  accent-color: #06b6d4;
+}
+</style>

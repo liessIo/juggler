@@ -153,6 +153,16 @@ class OllamaAdapter(BaseProvider):
             except Exception:
                 return False
     
+    def is_available(self) -> bool:
+        """Synchronous availability check for initialization"""
+        import httpx
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"{self.base_url}/api/tags")
+                return response.status_code == 200
+        except Exception:
+            return False
+    
     def validate_model(self, model: str) -> bool:
         """Check if model exists in Ollama"""
         # For now, we'll accept any model name

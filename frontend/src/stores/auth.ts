@@ -101,6 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user,
+    token,              // ← DIESE ZEILE WAR NEU HINZUGEFÜGT
     isAuthenticated,
     login,
     register,
