@@ -1,7 +1,7 @@
 # Juggler AI Chat System v2
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Version-2.1.0-cyan?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.1.1-cyan?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/Status-Active%20Development-green?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License">
 </div>
@@ -19,22 +19,20 @@
 - 🤖 **Multiple AI Providers** - Ollama (local), Groq, Anthropic Claude
 - 🧠 **Context Preservation** - Full conversation history maintained when switching models
 - 💾 **Persistent Storage** - Conversations and messages stored in SQLite database
-- 🎨 **Modern Terminal UI** - "The Expanse" inspired cyberpunk interface
+- 🎨 **Modern Sci-Fi UI** - Clean, professional interface inspired by sci-fi movies
 - ⚡ **Optimized Performance** - Sub-100ms model loading with intelligent caching
 - 🔑 **Secure Configuration** - API keys stored in database with masked display
 - 📊 **Token Tracking** - Monitor usage per conversation and provider
 - 🎯 **Model Selection** - Choose which models to display per provider
+- 🔄 **Session Management** - Auto-logout on token expiry with axios interceptors
+- 📚 **Conversation History** - Load and continue previous chats from database
 
 ## 🖼️ Screenshots
-JUGGLER AI SYSTEM v2.1.0
-Initializing neural interface...
-Loading language models...
-3 providers available
-12 models loaded
-System ready.
+JUGGLER AI v2.1
+Multi-provider AI chat system
+3 providers • 12 models • System ready
 
-Type command or query to begin_
-
+> Modern interface with sidebar navigation, model selection, and conversation history
 
 ## 🚀 Quick Start
 
@@ -98,16 +96,19 @@ API Keys Management
 Configure provider API keys through the web interface:
 
 Register/Login to the system
-Navigate to [CONFIG] in the sidebar
+Navigate to [Configuration] in the sidebar
 Switch to "API KEYS" tab
 Enter your API keys for Groq and/or Anthropic
+Toggle providers Active/Inactive as needed
 Switch to "MODEL SELECTION" tab to choose which models to display
 
+
 Note: All users share the same API keys (single-tenant design).
+
 Model Selection
 After configuring API keys:
 
-Go to Config → Model Selection
+Go to Configuration → Model Selection
 Select a provider (Ollama, Groq, Anthropic)
 Click "REFRESH MODELS" to load available models
 Check the models you want to use
@@ -120,16 +121,18 @@ Backend:
 
 FastAPI - Async web framework
 SQLAlchemy - ORM with SQLite (PostgreSQL ready)
-JWT - Authentication
+JWT - Authentication with automatic session management
 Provider Adapters - Unified interface for AI services
+Axios Interceptors - Automatic 401 handling
 
 Frontend:
 
 Vue 3 + TypeScript
 Pinia - State management
 PrimeVue - UI components
-Tailwind CSS 4 - Styling
+Tailwind CSS 4 - Modern styling with Inter font
 Vite - Build tool
+Vue Router - With keep-alive for state preservation
 
 Project Structure
 juggler/
@@ -160,62 +163,92 @@ juggler/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── LoginForm.vue
-│   │   │   └── ConfigView.vue
+│   │   │   ├── ConfigView.vue
+│   │   │   └── config/      # Config sub-components
+│   │   │       ├── ApiKeysTab.vue
+│   │   │       ├── ModelSelectionTab.vue
+│   │   │       └── SystemInfoTab.vue
 │   │   ├── stores/
 │   │   │   └── auth.ts
 │   │   ├── router/
-│   │   │   └── index.ts
+│   │   │   └── index.ts     # With keep-alive support
+│   │   ├── utils/
+│   │   │   └── axios.ts     # Centralized API client with interceptors
 │   │   ├── ChatView.vue     # Main chat interface
 │   │   └── App.vue
 │   └── package.json
 └── README.md
 🎯 Implementation Status
-✅ Completed (v2.1.0)
+✅ Completed (v2.1.1)
 Phase A - Context Transfer:
 
-Full conversation history sent to providers
-Seamless model switching within conversations
-Context maintained across sessions
+✅ Full conversation history sent to providers
+✅ Seamless model switching within conversations
+✅ Context maintained across sessions
 
-Phase B - Database Persistence (Backend):
+Phase B - Database Persistence:
 
-SQLite database with SQLAlchemy ORM
-User authentication with JWT
-Conversations and messages persistence
-Provider and model tracking per message
-Token usage tracking
+✅ SQLite database with SQLAlchemy ORM
+✅ User authentication with JWT
+✅ Conversations and messages persistence
+✅ Provider and model tracking per message
+✅ Token usage tracking
+✅ Load conversation history from database
+✅ Switch between previous conversations
+✅ Clickable conversation list in sidebar
 
 Configuration & UX:
 
-Secure API key management with masked display
-Model selection UI with per-provider configuration
-Performance optimization (6s → <100ms model loading)
-Auto-focus input after message send
-Remember last-used model per provider
-Provider filtering (only show configured providers)
+✅ Secure API key management with masked display
+✅ Model selection UI with per-provider configuration
+✅ Performance optimization (6s → <100ms model loading)
+✅ Auto-focus input after message send
+✅ Remember last-used model per provider
+✅ Provider filtering (only show configured providers)
+✅ Provider Active/Inactive toggles
+✅ Session management with automatic logout on 401
+✅ Keep-alive for chat state preservation
+✅ Modern UI with Inter font and consistent design
+✅ ConfigView refactored into sub-components
 
-🔄 In Progress
-Phase B - Database Persistence (Frontend):
+Bug Fixes (v2.1.1):
 
-Load conversation history from database
-Switch between previous conversations
-Display conversation list in sidebar
+✅ Fixed Invalid Date display for Anthropic messages
+✅ Fixed Groq model refresh (proper Dict return type)
+✅ Fixed session persistence when navigating to config
+✅ Fixed 401 error handling with axios interceptors
 
-📋 Planned
-Phase C - Advanced Context Engine:
+📋 Backlog
+Near Term:
+
+✏️ Rename conversations (edit title)
+📅 Show last interaction date/time in conversation history
+📎 File upload support in chats
+📁 Projects (organize files and chats)
+
+Analytics & Monitoring:
+
+📊 Token counter per message (input/output)
+📊 Token usage per conversation per model
+📊 Global token statistics per provider/model
+📊 Filter by day/week/month
+💰 Cost calculator based on token usage
+
+Future (Phase C - Advanced Context Engine):
 
 PostgreSQL with pgvector for semantic search
 Embedding pipeline for all messages
 RAG (Retrieval Augmented Generation)
 Long-term context memory
 Intelligent context assembly
+Message rerun with different models
+Context snapshots for reproducibility
 
-See the technical design document for Phase C details.
+See the CONTEXT_TRANSFER_COMPLETE.md for Phase C technical design details.
 🐛 Known Issues
 
-Frontend conversation history still uses in-memory storage
-Conversation list sidebar needs DB integration
 Long conversations (100+ messages) may experience latency
+Anthropic API occasionally returns 529 (Overloaded) during high traffic
 
 🤝 Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -241,7 +274,7 @@ Ollama for local AI model support
 Groq for blazing-fast cloud inference
 Anthropic for Claude models
 The FastAPI and Vue.js communities
-"The Expanse" for UI inspiration
+Modern sci-fi interfaces for design inspiration
 
 📧 Contact
 Stefan - @liessIo

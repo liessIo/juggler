@@ -42,20 +42,23 @@ class GroqAdapter(BaseProvider):
             logger.warning(f"Groq availability check failed: {e}")
             return False
     
-    async def list_models(self) -> List[str]:
-        """List available Groq models - IMMER live von der API"""
+    async def list_models(self) -> List[Dict[str, str]]:
+        """List available Groq models - returns dict format matching other adapters"""
         try:
-            # Direkt von der API holen, kein Cache
+            # Fetch models from API
             models_response = self.client.models.list()
-            model_ids = []
+            models = []
             
             for model in models_response.data:
-                # Filter out non-chat models if needed
                 if hasattr(model, 'id'):
-                    model_ids.append(model.id)
+                    models.append({
+                        "id": model.id,
+                        "name": model.id,  # Groq doesn't provide separate display names
+                        "description": f"Groq model: {model.id}"
+                    })
             
-            logger.info(f"Groq models fetched: {len(model_ids)} models available")
-            return sorted(model_ids) if model_ids else []
+            logger.info(f"Groq models fetched: {len(models)} models available")
+            return sorted(models, key=lambda x: x["id"]) if models else []
             
         except Exception as e:
             logger.error(f"Error listing Groq models: {e}")

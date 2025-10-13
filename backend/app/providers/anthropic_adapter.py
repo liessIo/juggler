@@ -26,33 +26,17 @@ class AnthropicAdapter(BaseProvider):
             "anthropic-version": "2023-06-01",
             "content-type": "application/json"
         }
-        
-        # Available models - Anthropic verwendet spezifische Versionsnummern
-        # Stand: Januar 2025
-        self.available_models = [
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
-            "claude-3-5-sonnet-20241022",  # Neueste Sonnet 3.5 Version
-            "claude-3-5-haiku-20241022",   # Neueste Haiku 3.5 Version
-            "claude-2.1",
-            "claude-2.0",
-            "claude-instant-1.2"
-        ]
     
     async def health_check(self) -> bool:
         """Check if Anthropic API is available"""
         try:
-            # Simple check - try to get API info (will fail with 401 if key invalid)
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.base_url}/messages",  # This will return 405 but proves connection
+                    f"{self.base_url}/models",
                     headers=self.headers,
                     timeout=5.0
                 )
-                # 405 Method Not Allowed is expected for GET request
-                # 401 would mean invalid API key
-                return response.status_code != 401
+                return response.status_code == 200
         except Exception as e:
             logger.warning(f"Anthropic availability check failed: {e}")
             return False
@@ -60,64 +44,55 @@ class AnthropicAdapter(BaseProvider):
     def is_available(self) -> bool:
         """Synchronous availability check for initialization"""
         try:
-            # Simple check - try to get API info (will fail with 401 if key invalid)
             with httpx.Client() as client:
                 response = client.get(
-                    f"{self.base_url}/messages",  # This will return 405 but proves connection
+                    f"{self.base_url}/models",
                     headers=self.headers,
                     timeout=5.0
                 )
-                # 405 Method Not Allowed is expected for GET request
-                # 401 would mean invalid API key
-                return response.status_code != 401
+                return response.status_code == 200
         except Exception as e:
             logger.warning(f"Anthropic availability check failed: {e}")
             return False
     
-    async def list_models(self) -> List[str]:
-        """List available Claude models"""
-        # Anthropic hat keine Models-API, aber wir können testen welche funktionieren
-        # Versuche mit einem einfachen Request zu testen welche Models verfügbar sind
-        
-        # Bekannte Models die wir testen können (Stand Januar 2025)
-        test_models = [
-            "claude-3-5-sonnet-latest",
-            "claude-3-5-haiku-latest", 
-            "claude-3-opus-latest",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
-            "claude-2.1",
-            "claude-instant-1.2"
-        ]
-        
-        available = []
-        for model in test_models:
-            # Quick test mit minimalem Request
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{self.base_url}/messages",
-                        headers=self.headers,
-                        json={
-                            "model": model,
-                            "messages": [{"role": "user", "content": "Hi"}],
-                            "max_tokens": 1
-                        },
-                        timeout=5.0
-                    )
-                    if response.status_code != 404:
-                        available.append(model)
-            except:
-                pass
-        
-        return available if available else ["claude-3-5-sonnet-latest"]  # Fallback
+    async def list_models(self) -> List[Dict[str, str]]:
+        """
+        List available Claude models from Anthropic API
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/models",
+                    headers=self.headers,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                models = []
+                
+                # Parse response according to Anthropic API format
+                for model in data.get("data", []):
+                    model_id = model.get("id", "")
+                    display_name = model.get("display_name", model_id)
+                    
+                    models.append({
+                        "id": model_id,
+                        "name": display_name,
+                        "description": f"Anthropic Claude model: {display_name}"
+                    })
+                
+                return models
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Anthropic API returned {e.response.status_code}: {e.response.text}")
+            raise Exception(f"Failed to fetch models from Anthropic API (HTTP {e.response.status_code})")
+        except Exception as e:
+            logger.error(f"Error fetching Anthropic models: {e}")
+            raise Exception(f"Failed to fetch models from Anthropic: {str(e)}")
     
     async def send_message(self, context: ContextPackage, model: str) -> ProviderResponse:
         """Send message to Anthropic API"""
-        if model not in self.available_models:
-            # Try anyway - maybe new models are available
-            logger.warning(f"Model {model} not in known list, trying anyway")
-        
         # Convert messages to Anthropic format
         messages = self._convert_messages(context.messages)
         
@@ -151,7 +126,7 @@ class AnthropicAdapter(BaseProvider):
                 if content and isinstance(content, list):
                     response_text = content[0].get("text", "")
                 
-                # Calculate tokens (Anthropic provides usage info)
+                # Calculate tokens
                 usage = data.get("usage", {})
                 tokens_input = usage.get("input_tokens", 0)
                 tokens_output = usage.get("output_tokens", 0)
@@ -189,8 +164,7 @@ class AnthropicAdapter(BaseProvider):
                     "content": content
                 })
             elif role == "system":
-                # System messages should be set separately in Anthropic
-                # Skip here as it's handled via system_prompt
+                # System messages handled separately
                 continue
             else:
                 # Convert unknown roles to user
@@ -207,10 +181,8 @@ class AnthropicAdapter(BaseProvider):
         model: str
     ) -> AsyncGenerator[str, None]:
         """Stream a message response from Anthropic"""
-        # Convert messages to Anthropic format
         messages = self._convert_messages(context_package.messages)
         
-        # Build request
         request_body = {
             "model": model,
             "messages": messages,
@@ -219,7 +191,6 @@ class AnthropicAdapter(BaseProvider):
             "stream": True
         }
         
-        # Add system prompt if provided
         if context_package.system_prompt:
             request_body["system"] = context_package.system_prompt
         

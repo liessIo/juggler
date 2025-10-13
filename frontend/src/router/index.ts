@@ -1,5 +1,3 @@
-// frontend/src/router/index.ts
-
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -15,25 +13,28 @@ const router = createRouter({
       path: '/',
       name: 'Chat',
       component: () => import('../ChatView.vue'),
-      meta: { requiresAuth: true }
+      meta: { 
+        requiresAuth: true,
+        keepAlive: true  // NEW
+      }
     },
     {
       path: '/config',
       name: 'Config',
       component: () => import('../components/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { 
+        requiresAuth: true,
+        keepAlive: false  // Config immer fresh
+      }
     }
   ]
 })
 
-// Navigation guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
-    next('/')
   } else {
     next()
   }

@@ -5,8 +5,11 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.models.user import User
 from app.models.schemas import UserCreate, TokenData
+from app.database import get_db
 import os
 from uuid import UUID
 
@@ -18,6 +21,10 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# HTTP Bearer scheme for token authentication
+security = HTTPBearer()
+
 
 class AuthService:
     @staticmethod
@@ -80,6 +87,34 @@ class AuthService:
         db.commit()
         db.refresh(db_user)
         return db_user
+
+
+# FastAPI Dependency for protected routes
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Dependency to get current authenticated user from JWT token
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    token = credentials.credentials
+    token_data = AuthService.decode_token(token)
+    
+    if token_data is None:
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.id == token_data.user_id).first()
+    if user is None:
+        raise credentials_exception
+    
+    return user
+
 
 # Global instance
 auth_service = AuthService()

@@ -1,7 +1,7 @@
 # backend/app/services/provider_service.py
 """
 Provider service for managing AI providers
-Updated: Support für Ollama, Groq und Anthropic
+Updated: Support für Ollama, Groq und Anthropic with Active/Inactive flag
 """
 from typing import Dict, Optional
 import logging
@@ -25,6 +25,38 @@ class ProviderService:
         self.providers: Dict[str, BaseProvider] = {}
         self._initialize_providers()
     
+    def _get_provider_config(self, db: Session, provider: str) -> Optional[Dict]:
+        """
+        Get provider configuration with backwards compatibility
+        Returns: Dict with {api_key, active, last_used} or None
+        """
+        # Try new schema first (provider as key, dict as value)
+        config = db.query(SystemConfig).filter(SystemConfig.key == provider).first()
+        if config and config.value:
+            if isinstance(config.value, dict):
+                return config.value
+        
+        # Backwards compatibility: old format was {provider}_api_key with string value
+        old_key = f"{provider}_api_key"
+        old_config = db.query(SystemConfig).filter(SystemConfig.key == old_key).first()
+        if old_config and old_config.value:
+            # Migrate to new format
+            new_config = {
+                "api_key": old_config.value,
+                "active": True,
+                "last_used": None
+            }
+            # Save in new format
+            new_entry = SystemConfig(key=provider, value=new_config)
+            db.add(new_entry)
+            # Delete old format
+            db.delete(old_config)
+            db.commit()
+            logger.info(f"Migrated {provider} config to new format")
+            return new_config
+        
+        return None
+    
     def _initialize_providers(self):
         """Initialize available providers based on configuration"""
         
@@ -32,23 +64,32 @@ class ProviderService:
         db = next(get_db())
         try:
             # 1. Initialize Ollama (lokal, immer verfügbar wenn läuft)
-            if settings.ollama_base_url:
+            ollama_config = self._get_provider_config(db, "ollama")
+            if ollama_config is None:
+                # Ollama has no API key, create default config
+                ollama_config = {"api_key": None, "active": True, "last_used": None}
+            
+            if ollama_config.get("active", True) and settings.ollama_base_url:
                 try:
                     ollama = OllamaAdapter({
                         "base_url": settings.ollama_base_url
                     })
-                    # Add is_available method check
-                    self.providers["ollama"] = ollama
-                    logger.info(f"✅ Ollama provider initialized at {settings.ollama_base_url}")
+                    if ollama.is_available():
+                        self.providers["ollama"] = ollama
+                        logger.info(f"✅ Ollama provider initialized at {settings.ollama_base_url}")
+                    else:
+                        logger.warning("⚠️ Ollama configured but not available")
                 except Exception as e:
                     logger.error(f"❌ Failed to initialize Ollama: {e}")
+            else:
+                logger.info("ℹ️ Ollama is disabled in configuration")
             
             # 2. Initialize Groq (Cloud Provider)
-            groq_config = db.query(SystemConfig).filter(SystemConfig.key == "groq_api_key").first()
-            if groq_config and groq_config.value:
+            groq_config = self._get_provider_config(db, "groq")
+            if groq_config and groq_config.get("api_key") and groq_config.get("active", True):
                 try:
                     groq = GroqAdapter({
-                        "api_key": groq_config.value
+                        "api_key": groq_config["api_key"]
                     })
                     if groq.is_available():
                         self.providers["groq"] = groq
@@ -57,17 +98,19 @@ class ProviderService:
                         logger.warning("⚠️ Groq API key provided but provider not available")
                 except Exception as e:
                     logger.error(f"❌ Failed to initialize Groq: {e}")
+            elif groq_config and not groq_config.get("active", True):
+                logger.info("ℹ️ Groq is disabled in configuration")
             else:
                 logger.info("ℹ️ No Groq API key configured")
             
             # 3. Initialize Anthropic (Cloud Provider)
-            anthropic_config = db.query(SystemConfig).filter(SystemConfig.key == "anthropic_api_key").first()
-            if anthropic_config and anthropic_config.value:
+            anthropic_config = self._get_provider_config(db, "anthropic")
+            if anthropic_config and anthropic_config.get("api_key") and anthropic_config.get("active", True):
                 try:
                     # Anthropic Adapter importieren
                     from app.providers.anthropic_adapter import AnthropicAdapter
                     anthropic = AnthropicAdapter({
-                        "api_key": anthropic_config.value
+                        "api_key": anthropic_config["api_key"]
                     })
                     if anthropic.is_available():
                         self.providers["anthropic"] = anthropic
@@ -78,6 +121,8 @@ class ProviderService:
                     logger.warning("⚠️ Anthropic adapter not found - needs to be created")
                 except Exception as e:
                     logger.error(f"❌ Failed to initialize Anthropic: {e}")
+            elif anthropic_config and not anthropic_config.get("active", True):
+                logger.info("ℹ️ Anthropic is disabled in configuration")
             else:
                 logger.info("ℹ️ No Anthropic API key configured")
                 
@@ -98,7 +143,7 @@ class ProviderService:
         
         provider = self.get_provider(provider_name)
         if not provider:
-            raise ValueError(f"Provider '{provider_name}' not available")
+            raise ValueError(f"Provider '{provider_name}' not available or disabled")
         
         # Create context package
         context = ContextPackage(
@@ -147,7 +192,7 @@ class ProviderService:
         return result
     
     def refresh_providers(self):
-        """Refresh provider configuration (z.B. nach API Key Update)"""
+        """Refresh provider configuration (z.B. nach API Key Update oder Active/Inactive Change)"""
         logger.info("Refreshing providers...")
         self.providers.clear()
         self._initialize_providers()

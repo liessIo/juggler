@@ -128,7 +128,7 @@ class OllamaAdapter(BaseProvider):
             except Exception as e:
                 yield f"Error: {str(e)}"
     
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> List[Dict[str, str]]:
         """List available models from Ollama"""
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
@@ -136,8 +136,16 @@ class OllamaAdapter(BaseProvider):
                 response.raise_for_status()
                 data = response.json()
                 
-                # Extract model names
-                models = [model["name"] for model in data.get("models", [])]
+                # Extract model names and convert to dict format
+                models = []
+                for model in data.get("models", []):
+                    model_name = model["name"]
+                    models.append({
+                        "id": model_name,
+                        "name": model_name,
+                        "description": f"Ollama model: {model_name}"
+                    })
+                
                 return models
                 
             except Exception as e:
