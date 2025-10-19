@@ -69,14 +69,14 @@ class ProviderService:
                 # Ollama has no API key, create default config
                 ollama_config = {"api_key": None, "active": True, "last_used": None}
             
-            if ollama_config.get("active", True) and settings.ollama_base_url:
+            if ollama_config.get("active", True) and settings.OLLAMA_BASE_URL:
                 try:
                     ollama = OllamaAdapter({
-                        "base_url": settings.ollama_base_url
+                        "base_url": settings.OLLAMA_BASE_URL
                     })
                     if ollama.is_available():
                         self.providers["ollama"] = ollama
-                        logger.info(f"✅ Ollama provider initialized at {settings.ollama_base_url}")
+                        logger.info(f"✅ Ollama provider initialized at {settings.OLLAMA_BASE_URL}")
                     else:
                         logger.warning("⚠️ Ollama configured but not available")
                 except Exception as e:

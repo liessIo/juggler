@@ -1,333 +1,353 @@
-<!-- frontend/src/ChatView.vue -->
+<!-- frontend/src/views/ChatView.vue -->
 <template>
-  <div class="min-h-screen bg-black flex text-gray-300">
-    <!-- Sidebar -->
-    <div class="w-72 bg-zinc-950 border-r border-zinc-800 flex flex-col">
-      <!-- Header -->
-      <div class="p-4 border-b border-zinc-800">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+  <div class="h-screen w-screen bg-black flex overflow-hidden">
+    <!-- LEFT SIDEBAR -->
+    <div class="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col overflow-hidden">
+      <div class="flex-shrink-0 p-3 border-b border-zinc-800">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded flex items-center justify-center">
+            <span class="text-white text-xs font-bold">J</span>
           </div>
           <div>
-            <h1 class="text-gray-100 font-semibold text-base">JUGGLER</h1>
-            <p class="text-cyan-500 text-xs">System Active</p>
+            <h1 class="text-gray-100 font-semibold text-sm">JUGGLER</h1>
+            <p class="text-cyan-500 text-xs">v3.0</p>
           </div>
         </div>
-        
         <button 
           @click="startNewChat"
-          class="w-full px-3 py-2 bg-gradient-to-r from-cyan-600/10 to-cyan-500/10 border border-cyan-600/30 hover:border-cyan-500 hover:bg-cyan-600/20 text-cyan-400 text-sm font-medium rounded-lg transition-all duration-300"
+          class="w-full px-2 py-1.5 bg-cyan-600/20 border border-cyan-600/30 hover:border-cyan-500 text-cyan-400 text-xs font-medium rounded transition-all"
         >
           New Session
         </button>
-        
-        <button 
-          @click="handleLogout"
-          class="w-full px-3 py-2 mt-2 bg-gradient-to-r from-red-600/10 to-red-500/10 border border-red-600/30 hover:border-red-500 hover:bg-red-600/20 text-red-400 text-sm font-medium rounded-lg transition-all duration-300"
-        >
-          Logout
-        </button>
+      </div>
+
+      <div class="flex-shrink-0 p-3 border-b border-zinc-800 space-y-2">
+        <div>
+          <div class="text-cyan-500 text-xs font-medium mb-1 uppercase">Provider</div>
+          <select 
+            v-model="selectedProvider"
+            @change="onProviderChange"
+            class="w-full px-2 py-1 bg-zinc-900 border border-zinc-700 hover:border-cyan-500/50 focus:border-cyan-500 text-gray-300 text-xs rounded transition-all outline-none"
+          >
+            <option v-for="(provider, key) in filteredProviders" :key="key" :value="key">
+              {{ key.toUpperCase() }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <div class="text-cyan-500 text-xs font-medium mb-1 uppercase">Model</div>
+          <select 
+            v-model="selectedModel"
+            @change="saveLastUsedModel"
+            :disabled="!availableModels.length"
+            class="w-full px-2 py-1 bg-zinc-900 border border-zinc-700 hover:border-cyan-500/50 focus:border-cyan-500 text-gray-300 text-xs rounded transition-all outline-none disabled:opacity-50"
+          >
+            <option v-if="!availableModels.length" value="">No models</option>
+            <option v-for="model in availableModels" :key="model" :value="model">
+              {{ model }}
+            </option>
+          </select>
+        </div>
+
         <button 
           @click="$router.push('/config')"
-          class="w-full px-3 py-2 mt-2 bg-gradient-to-r from-cyan-600/10 to-cyan-500/10 border border-cyan-600/30 hover:border-cyan-500 hover:bg-cyan-600/20 text-cyan-400 text-sm font-medium rounded-lg transition-all duration-300"
+          class="w-full px-2 py-1 bg-zinc-900 border border-zinc-700 hover:border-cyan-500/50 text-cyan-400 text-xs font-medium rounded transition-all"
         >
-          Configuration
+          ⚙ Config
         </button>
       </div>
-      
-      <!-- Provider & Model Selection -->
-      <div class="p-4 border-b border-zinc-800">
-        <!-- Provider Select -->
-        <div class="text-cyan-500 text-xs font-medium mb-2 uppercase tracking-wide">Provider</div>
-        <select 
-          v-if="Object.keys(filteredProviders).length > 0"
-          v-model="selectedProvider"
-          @change="onProviderChange"
-          class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 hover:border-cyan-500/50 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-gray-300 text-sm rounded-lg transition-all duration-200 outline-none mb-3"
-        >
-          <option v-for="(provider, key) in filteredProviders" :key="key" :value="key">
-            {{ key.toUpperCase() }}
-          </option>
-        </select>
-        
-        <!-- No Providers Message -->
-        <div v-else class="mb-3">
-          <div class="px-3 py-2 bg-yellow-900/20 border border-yellow-600/30 rounded-lg text-xs text-yellow-500">
-            No providers configured
-          </div>
-          <button 
-            @click="$router.push('/config?tab=models')"
-            class="mt-2 text-xs text-cyan-500 hover:text-cyan-400 transition-colors"
-          >
-            → Configure in settings
-          </button>
-        </div>
-        
-        <!-- Model Select with Refresh -->
-        <div class="flex items-center gap-2 mb-2">
-          <div class="text-cyan-500 text-xs font-medium uppercase tracking-wide">Model</div>
-          <button 
-            @click="refreshProviders"
-            class="ml-auto text-cyan-500 hover:text-cyan-400 text-sm transition-colors"
-            title="Configure models"
-          >
-            ⚙
-          </button>
-        </div>
-        
-        <select 
-          v-model="selectedModel"
-          @change="saveLastUsedModel"
-          :disabled="!availableModels.length"
-          class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 hover:border-cyan-500/50 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-gray-300 text-sm rounded-lg transition-all duration-200 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option v-if="!availableModels.length" value="">No models selected</option>
-          <option v-for="model in availableModels" :key="model" :value="model">
-            {{ model }}
-          </option>
-        </select>
-        
-        <!-- Link to config if no models -->
-        <div v-if="selectedProvider && availableModels.length === 0" class="mt-2">
-          <button 
-            @click="$router.push('/config?tab=models')"
-            class="text-xs text-cyan-500 hover:text-cyan-400 transition-colors"
-          >
-            → Configure models in settings
-          </button>
-        </div>
-        
-        <!-- Provider Status -->
-        <div class="mt-3 flex items-center gap-2">
-          <div class="flex gap-1">
-            <div v-for="i in 5" :key="i" 
-                 :class="['w-1 h-2.5 rounded-sm transition-all', i <= providerStatus ? 'bg-green-500' : 'bg-zinc-700']"></div>
-          </div>
-          <span class="text-xs font-medium" :class="providerStatusColor">
-            {{ providerStatusText }}
-          </span>
-        </div>
-        
-        <!-- Model Count -->
-        <div class="mt-2 text-xs text-zinc-500">
-          Available models: {{ availableModels.length }}
-        </div>
-      </div>
 
-      <!-- System Stats -->
-      <div class="flex-1 p-4 space-y-3 overflow-y-auto">
-        <div class="space-y-2">
-          <div class="flex justify-between text-xs">
-            <span class="text-cyan-500 font-medium uppercase tracking-wide">Messages</span>
-            <span class="text-zinc-400 font-mono">{{ messages.length.toString().padStart(3, '0') }}</span>
-          </div>
-          <div class="h-px bg-zinc-800"></div>
-        </div>
-        
-        <div class="space-y-2">
-          <div class="flex justify-between text-xs">
-            <span class="text-cyan-500 font-medium uppercase tracking-wide">Provider</span>
-            <span class="text-zinc-400">{{ selectedProvider?.toUpperCase() || 'NONE' }}</span>
-          </div>
-          <div class="h-px bg-zinc-800"></div>
-        </div>
-        
-        <div class="space-y-2">
-          <div class="flex justify-between text-xs">
-            <span class="text-cyan-500 font-medium uppercase tracking-wide">Status</span>
-            <span :class="isLoading ? 'text-yellow-500' : 'text-green-500'">
-              {{ isLoading ? 'Processing' : 'Ready' }}
-            </span>
-          </div>
-          <div class="h-px bg-zinc-800"></div>
-        </div>
-
-        <!-- Conversation History -->
-        <div class="mt-6">
-          <div class="text-cyan-500 text-xs font-medium uppercase tracking-wide mb-3">Recent Sessions</div>
+      <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-y-auto p-3 border-b border-zinc-800">
+          <div class="text-cyan-500 text-xs font-medium uppercase mb-2">Recent</div>
           <div class="space-y-1">
             <div 
               v-for="conv in conversationHistory" 
               :key="conv.id"
               @click="loadConversation(conv.id)"
               :class="[
-                'px-3 py-2 text-xs hover:text-gray-300 hover:bg-zinc-900 cursor-pointer truncate rounded-lg transition-all',
-                conversationId === conv.id ? 'text-cyan-400 bg-zinc-900 border-l-2 border-cyan-500' : 'text-zinc-500'
+                'px-2 py-1 text-xs cursor-pointer rounded transition-all truncate',
+                conversationId === conv.id 
+                  ? 'text-cyan-400 bg-zinc-900 border-l-2 border-cyan-500' 
+                  : 'text-zinc-500 hover:text-gray-300 hover:bg-zinc-900'
+              ]"
+              :title="conv.title"
+            >
+              {{ conv.title || 'New Conversation' }}
+            </div>
+            <div v-if="conversationHistory.length === 0" class="text-xs text-zinc-600 px-2 py-1">
+              No conversations
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-shrink-0 p-3 space-y-1.5 text-xs">
+          <div class="flex justify-between">
+            <span class="text-cyan-500">Messages:</span>
+            <span class="text-zinc-400 font-mono">{{ messages.length }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-cyan-500">Provider:</span>
+            <span class="text-zinc-400">{{ selectedProvider?.toUpperCase() || '-' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-shrink-0 p-3 border-t border-zinc-800">
+        <button 
+          @click="handleLogout"
+          class="w-full px-2 py-1 bg-red-600/20 border border-red-600/30 hover:border-red-500 text-red-400 text-xs font-medium rounded transition-all"
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="flex-1 flex flex-col">
+      <div class="flex-shrink-0 h-12 bg-zinc-950 border-b border-zinc-800 flex items-center px-4 justify-between">
+        <div class="flex items-center gap-3">
+          <div class="text-xs text-zinc-500">SESSION</div>
+          <div class="text-sm text-gray-300 font-mono">{{ currentTitle || 'New' }}</div>
+        </div>
+        <div v-if="selectedModel" class="text-xs text-zinc-500 font-mono">
+          {{ selectedProvider?.toUpperCase() }} :: {{ selectedModel }}
+        </div>
+      </div>
+
+      <!-- MESSAGES AREA -->
+      <div class="flex-1 min-h-0 overflow-y-auto bg-zinc-950/30" ref="messagesContainer">
+        <div class="max-w-4xl mx-auto p-4 space-y-4">
+          <!-- Boot Screen -->
+          <div v-if="messages.length === 0" class="text-center py-16 space-y-4">
+            <div class="text-2xl font-semibold text-gray-100">JUGGLER v3</div>
+            <div class="text-xs text-zinc-600">Multi-provider AI chat with Context Engine</div>
+          </div>
+
+          <!-- MESSAGES -->
+          <div v-for="(message, idx) in messages" :key="message.id">
+            <!-- USER MESSAGE -->
+            <div v-if="message.role === 'user'" class="flex justify-end">
+              <div class="max-w-2xl bg-cyan-600/20 border border-cyan-600/30 rounded px-3 py-2">
+                <div class="text-sm text-gray-200">{{ message.content }}</div>
+                <div class="text-xs text-zinc-600 mt-1">{{ formatTime(message) }}</div>
+              </div>
+            </div>
+
+            <!-- ASSISTANT MESSAGE(S) -->
+            <div v-else class="flex justify-start">
+              <div class="max-w-full w-full">
+                <!-- Get variants for this message -->
+                <div v-if="!getVariants(message.id) || getVariants(message.id).length === 0">
+                  <!-- Single response (full width) -->
+                  <div :class="[
+                    'rounded px-4 py-3 border',
+                    message.is_active !== false
+                      ? 'bg-zinc-900 border-zinc-800' 
+                      : 'bg-zinc-950 border-zinc-800 opacity-60'
+                  ]">
+                    <div class="flex justify-between items-start mb-2 pb-2 border-b border-zinc-700">
+                      <div class="text-xs font-medium">
+                        <span class="text-cyan-500">{{ message.provider?.toUpperCase() || 'N/A' }}</span>
+                        <span class="text-zinc-600 mx-1">::</span>
+                        <span class="text-cyan-400">{{ message.model || 'N/A' }}</span>
+                      </div>
+                      <div class="text-xs text-zinc-600">{{ formatTime(message) }}</div>
+                    </div>
+                    <div class="text-sm text-gray-300 whitespace-pre-wrap mb-3">{{ message.content }}</div>
+                    <div class="flex items-center gap-2">
+                      <button 
+                        @click="copyToClipboard(message.content)"
+                        class="text-cyan-600/40 hover:text-cyan-500 text-xs"
+                      >
+                        Copy
+                      </button>
+                      <button 
+                        @click="showRerunModal(message.id, $event)"
+                        :disabled="isLoading"
+                        class="text-cyan-500 hover:text-cyan-400 text-xs font-medium disabled:opacity-50"
+                      >
+                        Rerun
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Multiple responses (with alternatives table) -->
+                <div v-else class="space-y-3">
+                  <!-- Active response first -->
+                  <div class="bg-zinc-900 border border-zinc-800 rounded px-4 py-3">
+                    <div class="flex justify-between items-start mb-2 pb-2 border-b border-zinc-700">
+                      <div class="text-xs font-medium">
+                        <span class="text-cyan-500">{{ message.provider?.toUpperCase() || 'N/A' }}</span>
+                        <span class="text-zinc-600 mx-1">::</span>
+                        <span class="text-cyan-400">{{ message.model || 'N/A' }}</span>
+                      </div>
+                      <div class="text-xs text-zinc-600">{{ formatTime(message) }}</div>
+                    </div>
+                    <div class="text-sm text-gray-300 whitespace-pre-wrap mb-3">{{ message.content }}</div>
+                    <div class="flex items-center gap-2">
+                      <button 
+                        @click="copyToClipboard(message.content)"
+                        class="text-cyan-600/40 hover:text-cyan-500 text-xs"
+                      >
+                        Copy
+                      </button>
+                      <button 
+                        @click="showRerunModal(message.id, $event)"
+                        :disabled="isLoading"
+                        class="text-cyan-500 hover:text-cyan-400 text-xs font-medium disabled:opacity-50"
+                      >
+                        Rerun
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Alternatives table -->
+                  <div class="bg-zinc-950 border border-zinc-800 rounded p-3">
+                    <div class="text-xs text-zinc-600 font-medium mb-3 uppercase">Alternatives</div>
+                    <div class="grid grid-cols-3 gap-3">
+                      <!-- Original -->
+                      <div class="bg-zinc-900 border-2 border-cyan-600/50 rounded p-2">
+                        <div class="text-xs text-cyan-500 font-medium mb-1">ORIGINAL</div>
+                        <div class="text-xs text-gray-400 line-clamp-3 mb-2">{{ message.content }}</div>
+                        <div class="text-xs text-zinc-600 mb-2">{{ message.model }}</div>
+                        <button 
+                          @click="clearVariants(message.id)"
+                          class="w-full px-2 py-1 bg-cyan-600/30 border border-cyan-600/50 text-cyan-400 text-xs rounded hover:bg-cyan-600/40 transition-all"
+                        >
+                          Keep
+                        </button>
+                      </div>
+
+                      <!-- Variants -->
+                      <div 
+                        v-for="(variant, vidx) in getVariants(message.id).filter(v => !(v.provider === message.provider && v.model === message.model)).slice(0, 2)"
+                        :key="variant.id"
+                        class="bg-zinc-900 border border-zinc-800 rounded p-2 hover:border-cyan-600/30 transition-all"
+                      >
+                        <div class="text-xs text-zinc-400 font-medium mb-1">ALT {{ vidx + 1 }}</div>
+                        <div class="text-xs text-gray-400 line-clamp-3 mb-2">{{ variant.content }}</div>
+                        <div class="text-xs text-zinc-600 mb-2">{{ variant.model }}</div>
+                        <button 
+                          @click="selectVariant(variant.id, message.id)"
+                          :disabled="isLoading"
+                          class="w-full px-2 py-1 bg-cyan-600/20 border border-cyan-600/30 hover:border-cyan-500 text-cyan-400 text-xs rounded transition-all disabled:opacity-50"
+                        >
+                          Select
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="isLoading" class="flex justify-start">
+            <div class="bg-yellow-600/20 border border-yellow-600/30 rounded px-3 py-2">
+              <div class="text-xs text-yellow-500 flex items-center gap-2">
+                <div class="w-2 h-2 border border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                Processing...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INPUT -->
+      <div class="flex-shrink-0 border-t border-zinc-800 bg-zinc-950 p-3">
+        <form @submit.prevent="sendMessage" class="max-w-4xl mx-auto flex gap-2">
+          <input
+            ref="inputField"
+            v-model="inputMessage"
+            type="text"
+            placeholder="Type your message..."
+            class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-gray-300 text-sm rounded transition-all outline-none"
+            :disabled="isLoading || !selectedModel"
+          />
+          <button
+            type="submit"
+            :disabled="isLoading || !inputMessage.trim() || !selectedModel"
+            class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:from-zinc-800 disabled:to-zinc-800 text-white font-medium text-sm rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- RERUN CONTEXT MENU -->
+    <teleport to="body" v-if="rerunModal.show">
+      <div class="fixed inset-0 z-40" @click="rerunModal.show = false"></div>
+      <div 
+        class="fixed bg-zinc-900 border border-zinc-700 rounded shadow-lg w-56 z-50"
+        :style="{ top: rerunModal.y + 'px', left: rerunModal.x + 'px' }"
+        @click.stop
+      >
+        <div class="p-2 border-b border-zinc-800">
+          <div class="text-xs text-cyan-500 font-medium mb-1">Provider</div>
+          <div class="space-y-1 max-h-32 overflow-y-auto">
+            <div 
+              v-for="provider in getRerunProviders()"
+              :key="provider"
+              @click="rerunModal.provider = provider; updateRerunModels(messages.find(m => m.id === rerunModal.messageId))"
+              :class="[
+                'w-full px-2 py-1 text-xs rounded text-left transition-all truncate cursor-pointer',
+                rerunModal.provider === provider 
+                  ? 'bg-cyan-600/30 text-cyan-400 border border-cyan-600/50' 
+                  : 'bg-zinc-800 text-gray-300 hover:bg-zinc-700'
               ]"
             >
-              {{ conv.title }}
-            </div>
-            <div v-if="conversationHistory.length === 0" class="text-xs text-zinc-600 px-3 py-2">
-              No previous sessions
+              {{ provider.toUpperCase() }}
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Footer -->
-      <div class="p-4 border-t border-zinc-800">
-        <div class="flex items-center gap-2 text-xs text-zinc-600">
-          <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span>Powered by {{ selectedProvider || 'AI' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Panel -->
-    <div class="flex-1 flex flex-col">
-      <!-- Header -->
-      <div class="h-14 bg-zinc-950 border-b border-zinc-800 flex items-center px-6">
-        <div class="flex items-center gap-2 text-sm">
-          <span class="text-cyan-500 font-medium">Session:</span>
-          <span class="text-zinc-400">{{ currentTitle || 'New Session' }}</span>
-        </div>
-        <div class="ml-auto flex items-center gap-4">
-          <div v-if="selectedModel" class="text-xs text-zinc-500 font-mono">
-            {{ selectedProvider?.toUpperCase() }} :: {{ selectedModel }}
-          </div>
-          <div v-if="isLoading" class="flex items-center gap-2">
-            <div class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-            <span class="text-xs text-yellow-500 font-medium">Processing</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Messages -->
-      <div class="flex-1 overflow-y-auto bg-zinc-950/50" ref="messagesContainer">
-        <div class="max-w-4xl mx-auto p-6">
-          <!-- Boot Screen -->
-          <div v-if="messages.length === 0" class="space-y-6">
-            <div class="text-center space-y-4 py-12">
-              <div class="w-16 h-16 mx-auto bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl flex items-center justify-center">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h2 class="text-2xl font-semibold text-gray-100">Juggler AI v2.1</h2>
-              <p class="text-zinc-500 text-sm">Multi-provider AI chat system</p>
-              <div class="flex items-center justify-center gap-6 text-xs text-zinc-600">
-                <div>{{ Object.keys(filteredProviders).length }} providers</div>
-                <div>•</div>
-                <div>{{ totalModels }} models</div>
-                <div>•</div>
-                <div class="text-green-500">System ready</div>
-              </div>
-            </div>
-            
-            <!-- Quick Actions -->
-            <div class="grid grid-cols-3 gap-3 mt-8">
-              <button 
-                v-for="action in quickActions" 
-                :key="action.text"
-                @click="inputMessage = action.text; sendMessage()"
-                class="p-4 bg-zinc-900 border border-zinc-800 hover:border-cyan-500/50 hover:bg-zinc-900/70 rounded-lg transition-all text-left group"
-              >
-                <div class="text-cyan-500 text-xs font-medium mb-1.5 group-hover:text-cyan-400 transition-colors">{{ action.label }}</div>
-                <div class="text-zinc-500 text-xs">{{ action.preview }}</div>
-              </button>
-            </div>
-          </div>
-
-          <!-- Messages -->
-          <div v-for="message in messages" :key="message.id" class="mb-6">
-            <div class="flex items-start gap-4">
-              <!-- Avatar -->
-              <div class="mt-1">
-                <div v-if="message.role === 'user'" 
-                     class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-lg flex items-center justify-center text-white text-xs font-semibold">
-                  U
-                </div>
-                <div v-else 
-                     class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white text-xs font-semibold">
-                  AI
-                </div>
-              </div>
-              
-              <!-- Content -->
-              <div class="flex-1 min-w-0">
-                <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                  <div class="prose prose-invert max-w-none">
-                    <pre class="text-sm text-gray-300 whitespace-pre-wrap font-sans leading-relaxed m-0">{{ message.content }}</pre>
-                  </div>
-                  <div class="mt-3 pt-3 border-t border-zinc-800 flex items-center gap-4 text-xs text-zinc-600">
-                    <span>{{ formatTime(message) }}</span>
-                    <span v-if="message.model" class="text-zinc-700">{{ message.model }}</span>
-                    <button 
-                      v-if="message.role === 'assistant'" 
-                      @click="copyToClipboard(message.content)"
-                      class="ml-auto text-cyan-600/50 hover:text-cyan-500 transition-colors"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Loading State -->
-          <div v-if="isLoading" class="flex items-start gap-4">
-            <div class="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-              <div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <div class="flex-1">
-              <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-                <span class="text-yellow-500 text-sm">
-                  Processing your request...
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Input -->
-      <div class="border-t border-zinc-800 bg-zinc-950 p-4">
-        <div class="max-w-4xl mx-auto">
-          <form @submit.prevent="sendMessage" class="flex items-center gap-3">
-            <input
-              ref="inputField"
-              v-model="inputMessage"
-              type="text"
-              placeholder="Type your message..."
-              class="flex-1 px-4 py-3 bg-zinc-900 border border-zinc-700 hover:border-zinc-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-gray-300 text-sm rounded-lg transition-all outline-none"
-              :disabled="isLoading || !selectedModel"
-            />
-            <button
-              type="submit"
-              :disabled="isLoading || !inputMessage.trim() || !selectedModel"
-              class="px-6 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:from-zinc-800 disabled:to-zinc-800 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        <div class="p-2">
+          <div class="text-xs text-cyan-500 font-medium mb-1">Model</div>
+          <div class="space-y-1 max-h-48 overflow-y-auto">
+            <div 
+              v-for="model in rerunModal.models"
+              :key="model"
+              @click="!isLoading && rerunMessage(model)"
+              :class="[
+                'w-full px-2 py-1 text-xs rounded text-left transition-all truncate',
+                isLoading 
+                  ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed opacity-50' 
+                  : 'bg-zinc-800 text-gray-300 hover:bg-cyan-600/20 hover:text-cyan-400 cursor-pointer'
+              ]"
+              :title="model"
             >
-              Send
-            </button>
-          </form>
-          <div v-if="!selectedModel" class="mt-2 text-xs text-yellow-500">
-            Please select a model to start chatting
+              {{ model }}
+            </div>
+          </div>
+          <div v-if="isLoading" class="mt-2 pt-2 border-t border-zinc-800">
+            <div class="text-xs text-yellow-500 flex items-center gap-2">
+              <div class="w-2 h-2 border border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              Generating...
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-// Component name for keep-alive
 import { defineOptions } from 'vue'
-defineOptions({ name: 'Chat' })
+defineOptions({ name: 'ChatView' })
 
 import { ref, onMounted, nextTick, computed } from 'vue'
 import api from './utils/axios'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 
-// Auth
 const authStore = useAuthStore()
 const router = useRouter()
 
-// Types
 interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -335,39 +355,44 @@ interface Message {
   provider?: string
   model?: string
   timestamp: number
+  is_active?: boolean
 }
 
-interface Provider {
-  available: boolean
-  models: string[]
+interface Variant {
+  id: string
+  original_message_id: string
+  content: string
+  provider: string
+  model: string
+  is_canonical: boolean
 }
 
-// State
 const messages = ref<Message[]>([])
 const inputMessage = ref('')
 const inputField = ref<HTMLInputElement>()
 const isLoading = ref(false)
-const isRefreshing = ref(false)
 const conversationId = ref<string | null>(null)
-const providers = ref<Record<string, Provider>>({})
+const providers = ref<Record<string, {available: boolean, models: string[]}>>({})
 const selectedProvider = ref<string>('')
 const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const messagesContainer = ref<HTMLElement>()
 const currentTitle = ref('')
 const conversationHistory = ref<{id: string, title: string}[]>([])
-const startTime = ref(Date.now())
+const variants = ref<Variant[]>([])
 
-// Quick Actions
-const quickActions = [
-  { label: 'CODE', preview: 'Write functions...', text: 'Write a Python function to ' },
-  { label: 'EXPLAIN', preview: 'Break down concepts...', text: 'Explain in simple terms: ' },
-  { label: 'DEBUG', preview: 'Analyze problems...', text: 'Help me debug this code: ' }
-]
+const rerunModal = ref({
+  show: false,
+  messageId: '',
+  provider: '',
+  model: '',
+  models: [] as string[],
+  x: 0,
+  y: 0
+})
 
-// Computed
 const filteredProviders = computed(() => {
-  const filtered: Record<string, Provider> = {}
+  const filtered: Record<string, any> = {}
   for (const [key, provider] of Object.entries(providers.value)) {
     if (provider.available && provider.models.length > 0) {
       filtered[key] = provider
@@ -376,41 +401,286 @@ const filteredProviders = computed(() => {
   return filtered
 })
 
-const providerStatus = computed(() => {
-  if (!selectedProvider.value) return 0
+const getVariants = (messageId: string) => variants.value.filter(v => v.original_message_id === messageId)
+
+const getRerunProviders = () => {
+  const msg = messages.value.find(m => m.id === rerunModal.value.messageId)
+  
+  return Object.keys(filteredProviders.value).filter(provider => {
+    const allModels = providers.value[provider]?.models || []
+    
+    if (provider === msg?.provider) {
+      return allModels.length > 1
+    }
+    
+    return true
+  })
+}
+
+const fetchEnabledModels = async () => {
+  try {
+    const response = await api.get('/api/config/models/enabled')
+    const apiProviders = response.data.providers || {}
+    const transformed: Record<string, any> = {}
+    
+    for (const [providerKey, providerData] of Object.entries(apiProviders)) {
+      transformed[providerKey] = {
+        available: true,
+        models: (providerData as any).models || []
+      }
+    }
+    
+    providers.value = transformed
+    
+    if (!selectedProvider.value) {
+      const availableProvider = Object.keys(filteredProviders.value)[0]
+      if (availableProvider) {
+        selectedProvider.value = availableProvider
+        onProviderChange()
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch models:', error)
+  }
+}
+
+const fetchConversations = async () => {
+  try {
+    const response = await api.get('/api/chat/conversations')
+    conversationHistory.value = response.data.conversations
+  } catch (error) {
+    console.error('Failed to fetch conversations:', error)
+  }
+}
+
+const loadConversation = async (convId: string) => {
+  try {
+    const response = await api.get(`/api/chat/conversations/${convId}/messages`)
+    messages.value = response.data.messages.map((msg: any) => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      provider: msg.provider,
+      model: msg.model,
+      timestamp: new Date(msg.timestamp).getTime(),
+      is_active: true
+    }))
+    
+    conversationId.value = convId
+    if (messages.value.length > 0) {
+      const firstUserMsg = messages.value.find(m => m.role === 'user')
+      currentTitle.value = firstUserMsg ? firstUserMsg.content.slice(0, 30).toUpperCase() : 'SESSION'
+    }
+    
+    variants.value = []
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('Failed to load conversation:', error)
+  }
+}
+
+const onProviderChange = () => {
   const provider = providers.value[selectedProvider.value]
-  if (!provider) return 0
-  if (!provider.available) return 1
-  if (provider.models.length === 0) return 2
-  if (provider.models.length < 3) return 3
-  if (provider.models.length < 10) return 4
-  return 5
-})
+  if (provider?.available) {
+    availableModels.value = provider.models
+    selectedModel.value = provider.models[0] || ''
+    loadLastUsedModel()
+  }
+}
 
-const providerStatusText = computed(() => {
-  if (!selectedProvider.value) return 'No Provider'
-  const provider = providers.value[selectedProvider.value]
-  if (!provider) return 'Unknown'
-  if (!provider.available) return 'Offline'
-  if (provider.models.length === 0) return 'No Models'
-  return 'Online'
-})
+const sendMessage = async () => {
+  if (!inputMessage.value.trim() || !selectedModel.value) return
 
-const providerStatusColor = computed(() => {
-  if (providerStatus.value === 0) return 'text-zinc-600'
-  if (providerStatus.value === 1) return 'text-red-500'
-  if (providerStatus.value < 3) return 'text-yellow-500'
-  return 'text-green-500'
-})
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    role: 'user',
+    content: inputMessage.value,
+    timestamp: Date.now(),
+    is_active: true
+  }
+  
+  messages.value.push(userMessage)
+  if (!currentTitle.value) currentTitle.value = inputMessage.value.slice(0, 30).toUpperCase()
+  
+  const messageText = inputMessage.value
+  inputMessage.value = ''
+  isLoading.value = true
+  await nextTick()
+  scrollToBottom()
 
-const totalModels = computed(() => {
-  return Object.values(filteredProviders.value).reduce((sum, p) => sum + p.models.length, 0)
-})
+  try {
+    const response = await api.post('/api/chat/send', {
+      message: messageText,
+      provider: selectedProvider.value,
+      model: selectedModel.value,
+      conversation_id: conversationId.value
+    })
 
-// LocalStorage keys for last-used models
+    if (!conversationId.value) {
+      conversationId.value = response.data.conversation_id
+      await fetchConversations()
+    }
+
+    messages.value.push({
+      id: response.data.message_id,
+      role: 'assistant',
+      content: response.data.response,
+      provider: selectedProvider.value,
+      model: selectedModel.value,
+      timestamp: Date.now(),
+      is_active: true
+    })
+
+    if (response.data.variants) {
+      variants.value.push(...response.data.variants)
+    }
+
+    await nextTick()
+    scrollToBottom()
+  } catch (error: any) {
+    console.error('Failed:', error)
+    messages.value.push({
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `[ERROR] ${error.response?.data?.detail || 'Failed'}`,
+      timestamp: Date.now(),
+      is_active: true
+    })
+  } finally {
+    isLoading.value = false
+    await nextTick()
+    inputField.value?.focus()
+  }
+}
+
+const showRerunModal = (messageId: string, event: MouseEvent) => {
+  rerunModal.value.messageId = messageId
+  
+  const msg = messages.value.find(m => m.id === messageId)
+  rerunModal.value.provider = selectedProvider.value
+  updateRerunModels(msg)
+  
+  const rect = (event.target as HTMLElement).getBoundingClientRect()
+  rerunModal.value.x = rect.left
+  rerunModal.value.y = rect.bottom + 8
+  rerunModal.value.show = true
+}
+
+const updateRerunModels = (message?: Message) => {
+  const provider = rerunModal.value.provider
+  const allModels = providers.value[provider]?.models || []
+  
+  rerunModal.value.models = allModels.filter(model => {
+    if (message && message.provider === provider && message.model === model) {
+      return false
+    }
+    return true
+  })
+  
+  rerunModal.value.model = rerunModal.value.models[0] || ''
+}
+
+const rerunMessage = async (model: string) => {
+  rerunModal.value.show = false
+  isLoading.value = true
+  
+  try {
+    const response = await api.post('/api/chat/rerun', {
+      original_message_id: rerunModal.value.messageId,
+      provider: rerunModal.value.provider,
+      model: model
+    })
+
+    if (response.data.variant) {
+      variants.value.push(response.data.variant)
+    }
+
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('Failed to rerun:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const selectVariant = async (variantId: string, messageId: string) => {
+  isLoading.value = true
+  
+  try {
+    const response = await api.post('/api/chat/variants/select', {
+      variant_id: variantId,
+      original_message_id: messageId
+    })
+
+    // Add the new message to the conversation
+    if (response.data.new_message) {
+      messages.value.push({
+        id: response.data.new_message.id,
+        role: response.data.new_message.role as 'user' | 'assistant',
+        content: response.data.new_message.content,
+        provider: response.data.new_message.provider,
+        model: response.data.new_message.model,
+        timestamp: new Date(response.data.new_message.timestamp).getTime(),
+        is_active: true
+      })
+    }
+
+    // Mark the original message as inactive
+    if (response.data.deactivated_message_id) {
+      const originalMsg = messages.value.find(m => m.id === response.data.deactivated_message_id)
+      if (originalMsg) {
+        originalMsg.is_active = false
+      }
+    }
+
+    // Clear variants for this message
+    variants.value = variants.value.filter(v => v.original_message_id !== messageId)
+    
+    await nextTick()
+    scrollToBottom()
+  } catch (error) {
+    console.error('Failed to select variant:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const clearVariants = (messageId: string) => {
+  variants.value = variants.value.filter(v => v.original_message_id !== messageId)
+}
+
+const startNewChat = () => {
+  messages.value = []
+  conversationId.value = null
+  inputMessage.value = ''
+  currentTitle.value = ''
+  variants.value = []
+}
+
+const handleLogout = () => {
+  authStore.logout()
+  router.push('/login')
+}
+
+const scrollToBottom = () => {
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+const copyToClipboard = async (text: string) => {
+  await navigator.clipboard.writeText(text)
+}
+
+const formatTime = (message: Message) => {
+  const date = new Date(message.timestamp)
+  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
 const LAST_USED_MODEL_KEY = 'juggler_last_used_models'
 
-// Functions
 const loadLastUsedModel = () => {
   try {
     const saved = localStorage.getItem(LAST_USED_MODEL_KEY)
@@ -437,223 +707,13 @@ const saveLastUsedModel = () => {
   }
 }
 
-const fetchEnabledModels = async () => {
-  try {
-    const response = await api.get('/api/config/models/enabled')
-    
-    // Transform API response to expected format
-    const apiProviders = response.data.providers || {}
-    const transformed: Record<string, Provider> = {}
-    
-    for (const [providerKey, providerData] of Object.entries(apiProviders)) {
-      transformed[providerKey] = {
-        available: true,
-        models: (providerData as any).models || []
-      }
-    }
-    
-    providers.value = transformed
-    
-    // Auto-select first available provider if none selected
-    if (!selectedProvider.value) {
-      const availableProvider = Object.keys(filteredProviders.value).find(
-        key => filteredProviders.value[key].available && filteredProviders.value[key].models.length > 0
-      )
-      if (availableProvider) {
-        selectedProvider.value = availableProvider
-        onProviderChange()
-      }
-    }
-  } catch (error) {
-    console.error('Failed to fetch enabled models:', error)
-  }
-}
-
-const fetchConversations = async () => {
-  try {
-    const response = await api.get('/api/chat/conversations')
-    conversationHistory.value = response.data.conversations.map((conv: any) => ({
-      id: conv.id,
-      title: conv.title,
-      created_at: conv.created_at,
-      message_count: conv.message_count
-    }))
-  } catch (error) {
-    console.error('Failed to fetch conversations:', error)
-  }
-}
-
-const loadConversation = async (convId: string) => {
-  try {
-    // Load messages from this conversation
-    const response = await api.get(`/api/chat/conversations/${convId}/messages`)
-    
-    // Clear current chat
-    messages.value = []
-    conversationId.value = convId
-    
-    // Load messages with proper timestamp
-    messages.value = response.data.messages.map((msg: any) => ({
-      id: msg.id,
-      role: msg.role,
-      content: msg.content,
-      provider: msg.provider,
-      model: msg.model,
-      timestamp: new Date(msg.timestamp).getTime()
-    }))
-    
-    // Set title from first message
-    if (messages.value.length > 0) {
-      const firstUserMsg = messages.value.find(m => m.role === 'user')
-      currentTitle.value = firstUserMsg ? firstUserMsg.content.slice(0, 30).toUpperCase() : 'LOADED SESSION'
-    }
-    
-    // Scroll to bottom
-    await nextTick()
-    scrollToBottom()
-    
-  } catch (error) {
-    console.error('Failed to load conversation:', error)
-  }
-}
-
-const refreshProviders = async () => {
-  // Redirect to config for model management
-  router.push('/config?tab=models')
-}
-
-const onProviderChange = () => {
-  const provider = providers.value[selectedProvider.value]
-  if (provider && provider.available) {
-    availableModels.value = provider.models
-    if (provider.models.length > 0) {
-      // Try to load last-used model first
-      loadLastUsedModel()
-      
-      // If no last-used or not available, pick a good default
-      if (!selectedModel.value || !availableModels.value.includes(selectedModel.value)) {
-        const preferredModels = ['claude-3.5-sonnet', 'llama-3.3-70b', 'phi3:medium']
-        const defaultModel = provider.models.find(m => 
-          preferredModels.some(pref => m.includes(pref))
-        ) || provider.models[0]
-        selectedModel.value = defaultModel
-      }
-    } else {
-      selectedModel.value = ''
-    }
-  } else {
-    availableModels.value = []
-    selectedModel.value = ''
-  }
-}
-
-// Lifecycle
 onMounted(async () => {
   await fetchEnabledModels()
   await fetchConversations()
 })
-
-// Message handling
-const sendMessage = async () => {
-  if (!inputMessage.value.trim() || !selectedModel.value || !selectedProvider.value) return
-
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    role: 'user',
-    content: inputMessage.value,
-    timestamp: Date.now()
-  }
-  
-  messages.value.push(userMessage)
-  
-  if (!currentTitle.value) {
-    currentTitle.value = inputMessage.value.slice(0, 30).toUpperCase()
-  }
-  
-  const messageText = inputMessage.value
-  inputMessage.value = ''
-  isLoading.value = true
-
-  await nextTick()
-  scrollToBottom()
-
-  try {
-    const response = await api.post('/api/chat/send', {
-      message: messageText,
-      provider: selectedProvider.value,
-      model: selectedModel.value,
-      conversation_id: conversationId.value
-    })
-
-    if (!conversationId.value) {
-      conversationId.value = response.data.conversation_id
-      // Refresh conversation list after first message
-      await fetchConversations()
-    }
-
-    messages.value.push({
-      id: response.data.message_id,
-      role: 'assistant',
-      content: response.data.response,
-      provider: selectedProvider.value,
-      model: selectedModel.value,
-      timestamp: Date.now()
-    })
-
-    await nextTick()
-    scrollToBottom()
-  } catch (error: any) {
-    console.error('Failed:', error)
-    const errorMsg = error.response?.data?.detail || 'Connection failed. Check system status.'
-    messages.value.push({
-      id: Date.now().toString(),
-      role: 'assistant',
-      content: `[ERROR] ${errorMsg}`,
-      provider: selectedProvider.value,
-      timestamp: Date.now()
-    })
-  } finally {
-    isLoading.value = false
-    // UX FIX: Auto-focus input field after sending
-    await nextTick()
-    inputField.value?.focus()
-  }
-}
-
-const startNewChat = () => {
-  messages.value = []
-  conversationId.value = null
-  inputMessage.value = ''
-  currentTitle.value = ''
-}
-
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
-}
-
-const scrollToBottom = () => {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
-}
-
-const copyToClipboard = async (text: string) => {
-  await navigator.clipboard.writeText(text)
-}
-
-const formatTime = (message: Message) => {
-  const timestamp = message.timestamp || Date.now()
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 </script>
 
 <style scoped>
-* {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -666,11 +726,5 @@ const formatTime = (message: Message) => {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #52525b;
-}
-
-.prose pre {
-  background: transparent;
-  padding: 0;
-  margin: 0;
 }
 </style>
