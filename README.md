@@ -1,281 +1,378 @@
-# Juggler AI Chat System v2
+# Juggler AI Chat System v3.1.0
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Version-2.1.1-cyan?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/badge/Status-Active%20Development-green?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Version-3.1.0-cyan?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Status-Production%20Ready-green?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Phase-C%20Beta-yellow?style=for-the-badge" alt="Phase">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License">
 </div>
 
 <div align="center">
-  <h3>🤹 A self-hosted multi-model AI chat system for small teams</h3>
-  <p>Switch between AI models seamlessly while preserving full conversation context</p>
+  <h3>Juggler - Self-hosted Multi-Model AI Chat with Context Engine</h3>
+  <p>Switch between AI models seamlessly while preserving full conversation context. Compare responses. Branch conversations.</p>
 </div>
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔐 **Multi-User Support** - Separate chat histories per user with JWT authentication
-- 🤖 **Multiple AI Providers** - Ollama (local), Groq, Anthropic Claude
-- 🧠 **Context Preservation** - Full conversation history maintained when switching models
-- 💾 **Persistent Storage** - Conversations and messages stored in SQLite database
-- 🎨 **Modern Sci-Fi UI** - Clean, professional interface inspired by sci-fi movies
-- ⚡ **Optimized Performance** - Sub-100ms model loading with intelligent caching
-- 🔑 **Secure Configuration** - API keys stored in database with masked display
-- 📊 **Token Tracking** - Monitor usage per conversation and provider
-- 🎯 **Model Selection** - Choose which models to display per provider
-- 🔄 **Session Management** - Auto-logout on token expiry with axios interceptors
-- 📚 **Conversation History** - Load and continue previous chats from database
+- **Multi-Provider Support** - Ollama (local), Groq, Anthropic Claude
+- **Context Preservation** - Full conversation history maintained when switching models
+- **Conversation Branching** - Generate variants and explore alternative response paths
+- **Persistent Storage** - PostgreSQL with pgvector for semantic search
+- **Message Variants** - Generate alternatives and select preferred responses
+- **Context Snapshots** - Reproducible responses with stored context
+- **Token Tracking** - Monitor usage per conversation and provider
+- **Multi-User** - Separate chat histories with JWT authentication
+- **Modern UI** - The Expanse inspired sci-fi design with Tailwind CSS
+- **Performance** - Sub-100ms model loading with intelligent caching
 
-## 🖼️ Screenshots
-JUGGLER AI v2.1
-Multi-provider AI chat system
-3 providers • 12 models • System ready
+## What's New in v3.1.0
 
-> Modern interface with sidebar navigation, model selection, and conversation history
+- **Variant Selection Flow**: Create new messages instead of updating originals
+- **Conversation Branching**: Both conversation paths remain visible (active/inactive)
+- **Alternatives Table**: 3-column grid UI for comparing responses
+- **Context Engine (Phase C)**: PostgreSQL + pgvector + message embeddings
+- **Reproducibility**: Context snapshots for exact response replication
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.9+
-- Node.js 16+
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 15 with pgvector extension
 - Ollama (optional, for local models)
-- API Keys for Groq and/or Anthropic (optional)
 
 ### Installation
 
-1. **Clone the repository**
+**1. Clone Repository**
+
 ```bash
 git clone https://github.com/liessIo/juggler.git
 cd juggler
+```
 
-Setup Backend
+**2. Backend Setup**
 
-bashcd backend
+```bash
+cd backend
+
+# Virtual Environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # macOS/Linux
+# or: venv\Scripts\activate  (Windows)
+
+# Dependencies
 pip install -r requirements.txt
 
-Configure Environment
-
-bashcp .env.example .env
-# Edit .env with your SECRET_KEY
-
-Setup Frontend
-
-bashcd frontend
-npm install
-
-Optional: Run Ollama (for local models)
-
-bashollama serve
-ollama pull phi3:medium
-
-Start the Application
-
-Backend:
-bashcd backend
-uvicorn app.main:app --reload
-Frontend (new terminal):
-bashcd frontend
-npm run dev
-Access the application at http://localhost:5173
-🔧 Configuration
-Environment Variables
-Create a .env file in the backend directory:
-env# Required
-SECRET_KEY=your-secret-key-change-this-in-production
+# Environment
+cp .env.example .env
+# Edit .env with DATABASE_URL and API keys
 
 # Database
-DATABASE_URL=sqlite:///./data/juggler.db
+alembic upgrade head
 
-# Optional: Ollama (if running locally)
-OLLAMA_BASE_URL=http://localhost:11434
-API Keys Management
-Configure provider API keys through the web interface:
+# Start
+uvicorn app.main:app --reload
+```
 
-Register/Login to the system
-Navigate to [Configuration] in the sidebar
-Switch to "API KEYS" tab
-Enter your API keys for Groq and/or Anthropic
-Toggle providers Active/Inactive as needed
-Switch to "MODEL SELECTION" tab to choose which models to display
+**3. Frontend Setup**
 
+```bash
+cd frontend
 
-Note: All users share the same API keys (single-tenant design).
+# Dependencies
+npm install
 
-Model Selection
-After configuring API keys:
+# Environment
+cp .env.example .env
 
-Go to Configuration → Model Selection
-Select a provider (Ollama, Groq, Anthropic)
-Click "REFRESH MODELS" to load available models
-Check the models you want to use
-Click "SAVE SELECTION"
+# Start
+npm run dev
+```
 
-Only selected models will appear in the chat interface.
-🏗️ Architecture
-Tech Stack
-Backend:
+**4. Optional: Ollama**
 
-FastAPI - Async web framework
-SQLAlchemy - ORM with SQLite (PostgreSQL ready)
-JWT - Authentication with automatic session management
-Provider Adapters - Unified interface for AI services
-Axios Interceptors - Automatic 401 handling
+```bash
+ollama serve
+ollama pull phi3:medium
+```
 
-Frontend:
+### Access
 
-Vue 3 + TypeScript
-Pinia - State management
-PrimeVue - UI components
-Tailwind CSS 4 - Modern styling with Inter font
-Vite - Build tool
-Vue Router - With keep-alive for state preservation
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-Project Structure
+## Configuration
+
+### Environment Variables (.env)
+
+```env
+# Backend
+DATABASE_URL=postgresql://user:password@localhost/juggler_v3
+ENABLE_CONTEXT_ENGINE=true
+SECRET_KEY=your-secret-key-change-in-production
+
+# Providers
+GROQ_API_KEY=your-groq-key
+ANTHROPIC_API_KEY=your-anthropic-key
+
+# CORS
+CORS_ORIGINS=["http://localhost:5173"]
+```
+
+### API Key Management
+
+1. Register/Login to the system
+2. Navigate to Configuration (⚙️)
+3. Go to "API KEYS" tab
+4. Enter your API keys for providers
+5. Toggle providers Active/Inactive as needed
+6. Go to "MODEL SELECTION" tab
+7. Select which models to display in chat
+
+## Architecture
+
+### Tech Stack
+
+**Backend:**
+- FastAPI (async Python web framework)
+- PostgreSQL 15 + pgvector (vector search)
+- SQLAlchemy 2.0 (ORM)
+- JWT Authentication
+- sentence-transformers (embeddings)
+
+**Frontend:**
+- Vue 3 + Composition API + TypeScript
+- Pinia (state management)
+- Tailwind CSS v4 (styling)
+- Vite (build tool)
+- Axios (HTTP client)
+
+### Database Schema (Key Tables)
+
+```
+conversations
+  - id, user_id, title, created_at, total_tokens
+
+messages
+  - id, conversation_id, role, content
+  - provider, model, tokens_input, tokens_output
+
+message_variants
+  - id, original_message_id, content, provider, model
+  - is_canonical, context_hash
+
+message_embeddings (Phase C)
+  - id, message_id, embedding (Vector 384)
+
+context_snapshots (Phase C)
+  - id, generating_message_id, context_hash
+  - snapshot_data, snapshot_metadata
+```
+
+### Variant Selection Flow
+
+```
+User clicks "Select" on Alternative
+       ↓
+POST /api/chat/variants/select
+       ↓
+Backend: Create NEW message (don't update original)
+       ↓
+Response includes deactivated_message_id
+       ↓
+Frontend: Mark old message as is_active=false
+Frontend: Add new message as is_active=true
+       ↓
+Result: Both messages visible (active/inactive)
+        Conversation branching preserved
+```
+
+## Implementation Status
+
+### Phase A: Context Transfer ✅ COMPLETE
+
+- Full conversation history sent to providers
+- Seamless model switching
+- Provider info stored per message
+- Context maintained across sessions
+
+### Phase B: Database Persistence ✅ COMPLETE
+
+- PostgreSQL with message relationships
+- Conversation history loading
+- Multi-user support with JWT
+- Token tracking per message
+- Recent conversations sidebar
+
+### Phase C: Context Engine ✅ IN PROGRESS
+
+- **Implemented**: PostgreSQL migration, pgvector, message embeddings, context snapshots
+- **Implemented**: Message variants, variant selection, conversation branching
+- **In Progress**: Semantic search, RAG, intelligent context assembly
+- **Planned**: Streaming responses, advanced context orchestration
+
+## Project Structure
+
+```
 juggler/
 ├── backend/
 │   ├── app/
-│   │   ├── models/          # Database models
-│   │   │   ├── user.py      # User authentication
-│   │   │   ├── chat.py      # Conversations & messages
-│   │   │   ├── system_config.py  # API keys
-│   │   │   └── model_selection.py  # Model preferences
-│   │   ├── routers/         # API endpoints
-│   │   │   ├── auth.py      # Authentication
-│   │   │   ├── config.py    # Configuration
-│   │   │   └── chat.py      # (in main.py)
-│   │   ├── services/        # Business logic
+│   │   ├── models/
+│   │   │   ├── user.py
+│   │   │   ├── chat.py
+│   │   │   ├── message_variants.py
+│   │   │   ├── context_engine.py
+│   │   │   └── schemas.py
+│   │   ├── routers/
+│   │   │   ├── auth.py
+│   │   │   └── config.py
+│   │   ├── services/
 │   │   │   ├── auth_service.py
-│   │   │   └── provider_service.py
-│   │   ├── providers/       # AI provider adapters
+│   │   │   ├── provider_service.py
+│   │   │   └── context_orchestrator.py
+│   │   ├── providers/
 │   │   │   ├── base.py
 │   │   │   ├── ollama_adapter.py
 │   │   │   ├── groq_adapter.py
 │   │   │   └── anthropic_adapter.py
-│   │   ├── settings.py      # App configuration
-│   │   ├── database.py      # Database setup
-│   │   └── main.py          # FastAPI app
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── settings.py
+│   │   └── __init__.py
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── LoginForm.vue
-│   │   │   ├── ConfigView.vue
-│   │   │   └── config/      # Config sub-components
-│   │   │       ├── ApiKeysTab.vue
-│   │   │       ├── ModelSelectionTab.vue
-│   │   │       └── SystemInfoTab.vue
+│   │   │   ├── ChatView.vue
+│   │   │   └── ConfigView.vue
 │   │   ├── stores/
 │   │   │   └── auth.ts
-│   │   ├── router/
-│   │   │   └── index.ts     # With keep-alive support
 │   │   ├── utils/
-│   │   │   └── axios.ts     # Centralized API client with interceptors
-│   │   ├── ChatView.vue     # Main chat interface
-│   │   └── App.vue
-│   └── package.json
-└── README.md
-🎯 Implementation Status
-✅ Completed (v2.1.1)
-Phase A - Context Transfer:
+│   │   │   └── axios.ts
+│   │   ├── App.vue
+│   │   └── main.ts
+│   ├── package.json
+│   └── vite.config.ts
+├── README.md
+├── CONTEXT_TRANSFER_COMPLETE.md
+└── .gitignore
+```
 
-✅ Full conversation history sent to providers
-✅ Seamless model switching within conversations
-✅ Context maintained across sessions
+## API Endpoints
 
-Phase B - Database Persistence:
+### Chat
 
-✅ SQLite database with SQLAlchemy ORM
-✅ User authentication with JWT
-✅ Conversations and messages persistence
-✅ Provider and model tracking per message
-✅ Token usage tracking
-✅ Load conversation history from database
-✅ Switch between previous conversations
-✅ Clickable conversation list in sidebar
+```
+POST /api/chat/send
+  Send message and get response
 
-Configuration & UX:
+POST /api/chat/rerun
+  Generate variant with different model
 
-✅ Secure API key management with masked display
-✅ Model selection UI with per-provider configuration
-✅ Performance optimization (6s → <100ms model loading)
-✅ Auto-focus input after message send
-✅ Remember last-used model per provider
-✅ Provider filtering (only show configured providers)
-✅ Provider Active/Inactive toggles
-✅ Session management with automatic logout on 401
-✅ Keep-alive for chat state preservation
-✅ Modern UI with Inter font and consistent design
-✅ ConfigView refactored into sub-components
+POST /api/chat/variants/select
+  Select variant and create new message
 
-Bug Fixes (v2.1.1):
+GET /api/chat/conversations
+  List user conversations
 
-✅ Fixed Invalid Date display for Anthropic messages
-✅ Fixed Groq model refresh (proper Dict return type)
-✅ Fixed session persistence when navigating to config
-✅ Fixed 401 error handling with axios interceptors
+GET /api/chat/conversations/{id}/messages
+  Get messages for conversation
 
-📋 Backlog
-Near Term:
+GET /api/chat/messages/{message_id}/context
+  Get context used for message
+```
 
-✏️ Rename conversations (edit title)
-📅 Show last interaction date/time in conversation history
-📎 File upload support in chats
-📁 Projects (organize files and chats)
+### Configuration
 
-Analytics & Monitoring:
+```
+GET /api/config/models/enabled
+  Get enabled models per provider
 
-📊 Token counter per message (input/output)
-📊 Token usage per conversation per model
-📊 Global token statistics per provider/model
-📊 Filter by day/week/month
-💰 Cost calculator based on token usage
+POST /api/config/api-keys
+  Update API keys
 
-Future (Phase C - Advanced Context Engine):
+GET /api/providers/health
+  Get provider health status
+```
 
-PostgreSQL with pgvector for semantic search
-Embedding pipeline for all messages
-RAG (Retrieval Augmented Generation)
-Long-term context memory
-Intelligent context assembly
-Message rerun with different models
-Context snapshots for reproducibility
+### Authentication
 
-See the CONTEXT_TRANSFER_COMPLETE.md for Phase C technical design details.
-🐛 Known Issues
+```
+POST /api/auth/register
+  Create user account
 
-Long conversations (100+ messages) may experience latency
-Anthropic API occasionally returns 529 (Overloaded) during high traffic
+POST /api/auth/login
+  Login and get JWT token
 
-🤝 Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
-Development Setup
+POST /api/auth/logout
+  Logout
+```
 
-Fork the repository
-Create your feature branch (git checkout -b feature/AmazingFeature)
-Commit your changes (git commit -m 'Add some AmazingFeature')
-Push to the branch (git push origin feature/AmazingFeature)
-Open a Pull Request
+## Backlog (Priority)
 
-Code Style
+**High**:
+- [ ] Auto-embedding on message save
+- [ ] Semantic context retrieval (pgvector search)
+- [ ] Streaming responses (WebSocket)
+- [ ] Circuit breaker integration
 
-Backend: Follow PEP 8
-Frontend: ESLint + TypeScript strict mode
-Commit messages: Conventional Commits format
+**Medium**:
+- [ ] Multi-user conversation sharing
+- [ ] Advanced context reranking
+- [ ] Analytics dashboard
+- [ ] Message search/filtering
 
-📝 License
-This project is licensed under the MIT License - see the LICENSE file for details.
-🙏 Acknowledgments
+**Low**:
+- [ ] Voice input/output
+- [ ] Plugin system
+- [ ] Advanced RAG features
 
-Ollama for local AI model support
-Groq for blazing-fast cloud inference
-Anthropic for Claude models
-The FastAPI and Vue.js communities
-Modern sci-fi interfaces for design inspiration
+## Known Issues
 
-📧 Contact
-Stefan - @liessIo
-Project Link: https://github.com/liessIo/juggler
+- Embeddings not auto-generated on message save (manual phase)
+- Context assembly is static (no semantic search yet)
+- No streaming responses (full response wait required)
+
+## Contributing
+
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/AmazingFeature`
+3. Commit changes: `git commit -m 'Add AmazingFeature'`
+4. Push to branch: `git push origin feature/AmazingFeature`
+5. Open Pull Request
+
+**Code Style**:
+- Backend: PEP 8
+- Frontend: ESLint + TypeScript strict mode
+- Commits: Conventional Commits
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Acknowledgments
+
+- Ollama for local AI support
+- Groq for fast cloud inference
+- Anthropic for Claude models
+- FastAPI and Vue.js communities
+- The Expanse for design inspiration
+
+## Contact
+
+Stefan - [@liessIo](https://github.com/liessIo)  
+Project: [github.com/liessIo/juggler](https://github.com/liessIo/juggler)
+
+---
+
+## Documentation
+
+- [CONTEXT_TRANSFER_COMPLETE.md](./CONTEXT_TRANSFER_COMPLETE.md) - Full architecture review and technical design
+- [QUICKSTART.md](./QUICKSTART.md) - Detailed setup guide
